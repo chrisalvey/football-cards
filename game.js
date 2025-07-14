@@ -386,11 +386,18 @@ class GameState {
     updateOtherPlayersDisplay() {
         const gameData = this.loadGameData();
         
+        // Debug logging
+        console.log('updateOtherPlayersDisplay called');
+        console.log('Current player:', this.currentPlayer);
+        console.log('Game data players:', gameData.players);
+        
         // Clean up inactive players (not seen in last 30 seconds)
         const now = Date.now();
         Object.keys(gameData.players || {}).forEach(playerName => {
             const player = gameData.players[playerName];
+            console.log(`Player ${playerName} last seen: ${now - player.lastSeen}ms ago`);
             if (playerName !== this.currentPlayer && now - player.lastSeen > 30000) {
+                console.log(`Removing inactive player: ${playerName}`);
                 delete gameData.players[playerName];
                 delete gameData.hands?.[playerName];
             }
@@ -398,15 +405,18 @@ class GameState {
         this.saveGameData(gameData);
         
         const others = Object.values(gameData.players || {}).filter(p => p.name !== this.currentPlayer);
+        console.log('Other players:', others);
         
         const section = document.getElementById('other-players-section');
         const container = document.getElementById('other-players-list');
         
         if (!others.length) {
+            console.log('No other players, hiding section');
             section.style.display = 'none';
             return;
         }
 
+        console.log('Showing other players section with', others.length, 'players');
         section.style.display = 'block';
         container.innerHTML = others.map(player => `
             <div class="other-player">
