@@ -1,4 +1,4 @@
-// Ultra-Simplified Football Card Game
+// Firebase-Enabled Football Card Game
 class GameState {
     constructor() {
         // Core game state
@@ -12,21 +12,149 @@ class GameState {
         this.holdCards = [];
         this.activeEffects = {};
         this.lastMessageCheck = 0;
-        this.gameId = 'football-card-game';
+        this.gameRef = null;
+        this.playersRef = null;
+        this.messagesRef = null;
         
         this.init();
     }
 
     init() {
+        this.setupFirebase();
         this.setupEventListeners();
         this.showScreen('welcome-screen');
         this.updateWelcomeDisplay();
-        this.startPolling();
+    }
+
+    setupFirebase() {
+        // Firebase references
+        this.gameRef = database.ref('game');
+        this.playersRef = database.ref('game/players');
+        this.handsRef = database.ref('game/hands');
+        this.messagesRef = database.ref('game/messages');
+        
+        // Listen for player changes
+        this.playersRef.on('value', (snapshot) => {
+            const players = snapshot.val() || {};
+            this.handlePlayersUpdate(players);
+        });
+        
+        // Listen for messages
+        this.messagesRef.on('child_added', (snapshot) => {
+            const message = snapshot.val();
+            this.handleNewMessage(message);
+        });
+        
+        // Listen for reset events
+        database.ref('game/resetNotification').on('value', (snapshot) => {
+            const resetData = snapshot.val();
+            if (resetData) {
+                this.handleResetNotification(resetData);
+            }
+        });
+    }
+
+    // === FIREBASE DATA MANAGEMENT ===
+    
+    async savePlayerData() {
+        if (!this.currentPlayer) return;
+        
+        const playerData = {
+            name: this.currentPlayer,
+            score: this.score,
+            cardsInHand: this.playerHand.length,
+            cardsPlayed: this.cardsPlayed,
+            lastSeen: Date.now()
+        };
+        
+        const handData = [...this.playerHand];
+        
+        await Promise.all([
+            this.playersRef.child(this.currentPlayer).set(playerData),
+            this.handsRef.child(this.currentPlayer).set(handData)
+        ]);
+    }
+
+    async removePlayerData() {
+        if (!this.currentPlayer) return;
+        
+        await Promise.all([
+            this.playersRef.child(this.currentPlayer).remove(),
+            this.handsRef.child(this.currentPlayer).remove()
+        ]);
+    }
+
+    async getPlayerHand(playerName) {
+        const snapshot = await this.handsRef.child(playerName).once('value');
+        return snapshot.val() || [];
+    }
+
+    async broadcastMessage(text) {
+        const message = {
+            text,
+            timestamp: Date.now(),
+            player: this.currentPlayer
+        };
+        
+        await this.messagesRef.push(message);
+        
+        // Keep only last 20 messages
+        const snapshot = await this.messagesRef.once('value');
+        const messages = snapshot.val() || {};
+        const messageKeys = Object.keys(messages);
+        
+        if (messageKeys.length > 20) {
+            const oldKeys = messageKeys.slice(0, messageKeys.length - 20);
+            const updates = {};
+            oldKeys.forEach(key => updates[key] = null);
+            await this.messagesRef.update(updates);
+        }
+    }
+
+    // === FIREBASE EVENT HANDLERS ===
+    
+    handlePlayersUpdate(players) {
+        this.players = players;
+        
+        if (this.gameStarted) {
+            this.updateOtherPlayersDisplay();
+            this.updateOnlineCount();
+        } else {
+            this.updateWelcomeDisplay();
+        }
+    }
+
+    handleNewMessage(message) {
+        if (!message || !this.currentPlayer) return;
+        
+        // Only show messages from other players that are newer than our last check
+        if (message.player !== this.currentPlayer && message.timestamp > this.lastMessageCheck) {
+            this.showMessage(message.text, 'info');
+            this.lastMessageCheck = Math.max(this.lastMessageCheck, message.timestamp);
+        }
+    }
+
+    async handleResetNotification(resetData) {
+        if (!resetData || !this.currentPlayer) return;
+        
+        const resetTime = Date.now() - resetData.timestamp;
+        
+        // If reset happened recently and we didn't trigger it
+        if (resetTime < 10000 && resetData.resetBy !== this.currentPlayer) {
+            this.showMessage(`${resetData.resetBy} reset the game for everyone!`, 'info');
+            
+            setTimeout(() => {
+                // Clear the reset notification and reload
+                database.ref('game').remove().then(() => {
+                    location.reload();
+                });
+            }, 2000);
+        }
     }
 
     // === CORE GAME MECHANICS ===
     
-    joinGame() {
+    async joinGame() {
         const name = document.getElementById('player-name-welcome').value.trim();
         
         if (!name || name.length > 20) {
@@ -34,7 +162,9 @@ class GameState {
             return;
         }
 
-        if (this.isNameTaken(name)) {
+        // Check if name is taken
+        const snapshot = await this.playersRef.child(name).once('value');
+        if (snapshot.exists()) {
             this.showMessage('Name already taken', 'error');
             return;
         }
@@ -43,8 +173,8 @@ class GameState {
         this.gameStarted = true;
         this.lastMessageCheck = Date.now();
         
-        this.addPlayerToGame();
         this.startNewHand();
+        await this.savePlayerData();
         this.showGameScreen();
     }
 
@@ -59,10 +189,9 @@ class GameState {
         
         this.dealCards(5);
         this.updateDisplay();
-        this.saveMyData();
     }
 
-    playCard(index) {
+    async playCard(index) {
         const card = this.playerHand[index];
         if (!card) return;
 
@@ -71,20 +200,20 @@ class GameState {
         this.cardsPlayed++;
 
         if (card.type === 'event') {
-            this.handleEventCard(card);
+            await this.handleEventCard(card);
         } else if (card.playType === 'hold') {
-            this.handleHoldCard(card);
+            await this.handleHoldCard(card);
         } else {
-            this.handleActionCard(card, index);
+            this.handleActionCard(card);
             return; // Action cards handle their own flow
         }
 
         this.dealCards(1);
         this.updateDisplay();
-        this.saveMyData();
+        await this.savePlayerData();
     }
 
-    handleEventCard(card) {
+    async handleEventCard(card) {
         let points = card.points;
         if (this.activeEffects.doubleNext) {
             points *= 2;
@@ -92,17 +221,17 @@ class GameState {
         }
         
         this.score += points;
-        this.broadcastMessage(`${this.currentPlayer} played ${card.name} (${points} pts)`);
+        await this.broadcastMessage(`${this.currentPlayer} played ${card.name} (${points} pts)`);
         this.showMessage(`${card.name} for ${points} points!`, 'success');
     }
 
-    handleHoldCard(card) {
+    async handleHoldCard(card) {
         this.holdCards.push(card);
         
         if (card.id === 'double_next_score') this.activeEffects.doubleNext = true;
         if (card.id === 'block_steal') this.activeEffects.blockSteal = true;
         
-        this.broadcastMessage(`${this.currentPlayer} activated ${card.name}`);
+        await this.broadcastMessage(`${this.currentPlayer} activated ${card.name}`);
         this.showMessage(`${card.name} activated!`, 'success');
     }
 
@@ -122,79 +251,90 @@ class GameState {
         }
     }
 
-    executeActionCard(card, target = null) {
+    async executeActionCard(card, target = null) {
         let result = '';
         
         switch (card.id) {
             case 'steal_random_card':
-                result = this.stealFromPlayer(target);
+                result = await this.stealFromPlayer(target);
                 break;
             case 'swap_hands':
-                result = this.swapWithPlayer(target);
+                result = await this.swapWithPlayer(target);
                 break;
             case 'draw_from_all':
-                result = this.drawFromAll();
+                result = await this.drawFromAll();
                 break;
             case 'peek_at_hand':
-                result = this.peekAtPlayer(target);
+                result = await this.peekAtPlayer(target);
                 break;
         }
 
-        this.broadcastMessage(`${this.currentPlayer} played ${card.name}`);
+        await this.broadcastMessage(`${this.currentPlayer} played ${card.name}`);
         this.showMessage(result || `${card.name} played!`, 'success');
         this.closeActionModal();
         this.dealCards(1);
         this.updateDisplay();
-        this.saveMyData();
+        await this.savePlayerData();
     }
 
     // === ACTION CARD EFFECTS ===
 
-    stealFromPlayer(targetName) {
-        const gameData = this.loadGameData();
-        const theirHand = gameData.hands?.[targetName];
+    async stealFromPlayer(targetName) {
+        const theirHand = await this.getPlayerHand(targetName);
         
-        if (!theirHand?.length) return `${targetName} has no cards`;
+        if (!theirHand.length) return `${targetName} has no cards`;
 
         const stolenCard = theirHand.splice(Math.floor(Math.random() * theirHand.length), 1)[0];
         this.playerHand.push(stolenCard);
-        this.saveGameData(gameData);
+        
+        // Update their hand in Firebase
+        await this.handsRef.child(targetName).set(theirHand);
+        await this.playersRef.child(targetName).child('cardsInHand').set(theirHand.length);
         
         return `Stole ${stolenCard.name} from ${targetName}!`;
     }
 
-    swapWithPlayer(targetName) {
-        const gameData = this.loadGameData();
-        const theirHand = gameData.hands?.[targetName];
+    async swapWithPlayer(targetName) {
+        const theirHand = await this.getPlayerHand(targetName);
         
         if (!theirHand) return `Cannot swap with ${targetName}`;
 
-        [this.playerHand, gameData.hands[targetName]] = [theirHand, this.playerHand];
-        this.saveGameData(gameData);
+        const myHand = [...this.playerHand];
+        this.playerHand = [...theirHand];
+        
+        // Update both hands in Firebase
+        await Promise.all([
+            this.handsRef.child(targetName).set(myHand),
+            this.handsRef.child(this.currentPlayer).set(this.playerHand),
+            this.playersRef.child(targetName).child('cardsInHand').set(myHand.length),
+            this.playersRef.child(this.currentPlayer).child('cardsInHand').set(this.playerHand.length)
+        ]);
         
         return `Swapped hands with ${targetName}!`;
     }
 
-    drawFromAll() {
-        const gameData = this.loadGameData();
+    async drawFromAll() {
+        const otherPlayers = this.getOtherPlayers();
         let drawn = 0;
-
-        this.getOtherPlayers().forEach(playerName => {
-            const theirHand = gameData.hands?.[playerName];
-            if (theirHand?.length) {
+        
+        for (const playerName of otherPlayers) {
+            const theirHand = await this.getPlayerHand(playerName);
+            if (theirHand.length > 0) {
                 const card = theirHand.splice(Math.floor(Math.random() * theirHand.length), 1)[0];
                 this.playerHand.push(card);
                 drawn++;
+                
+                // Update their hand
+                await this.handsRef.child(playerName).set(theirHand);
+                await this.playersRef.child(playerName).child('cardsInHand').set(theirHand.length);
             }
-        });
+        }
 
-        this.saveGameData(gameData);
         return `Drew ${drawn} cards!`;
     }
 
-    peekAtPlayer(targetName) {
-        const gameData = this.loadGameData();
-        const theirHand = gameData.hands?.[targetName];
+    async peekAtPlayer(targetName) {
+        const theirHand = await this.getPlayerHand(targetName);
         
         if (!theirHand) return `Cannot peek at ${targetName}`;
 
@@ -204,7 +344,7 @@ class GameState {
 
     // === UNDO SYSTEM ===
 
-    undoLastPlay() {
+    async undoLastPlay() {
         if (!this.playHistory.length) return;
 
         const lastPlay = this.playHistory.pop();
@@ -223,62 +363,8 @@ class GameState {
         if (this.playerHand.length > 5) this.playerHand.pop();
 
         this.updateDisplay();
-        this.saveMyData();
+        await this.savePlayerData();
         this.showMessage('Undid last play', 'info');
-    }
-
-    // === DATA MANAGEMENT ===
-
-    loadGameData() {
-        try {
-            return JSON.parse(localStorage.getItem(this.gameId) || '{}');
-        } catch {
-            return {};
-        }
-    }
-
-    saveGameData(data) {
-        try {
-            localStorage.setItem(this.gameId, JSON.stringify(data));
-        } catch (e) {
-            console.error('Save failed:', e);
-        }
-    }
-
-    saveMyData() {
-        const gameData = this.loadGameData();
-        
-        // Initialize structure
-        if (!gameData.players) gameData.players = {};
-        if (!gameData.hands) gameData.hands = {};
-        if (!gameData.messages) gameData.messages = [];
-
-        // Save my current state
-        gameData.players[this.currentPlayer] = {
-            name: this.currentPlayer,
-            score: this.score,
-            cardsInHand: this.playerHand.length,
-            cardsPlayed: this.cardsPlayed,
-            lastSeen: Date.now()
-        };
-        
-        gameData.hands[this.currentPlayer] = [...this.playerHand];
-        this.saveGameData(gameData);
-    }
-
-    addPlayerToGame() {
-        const gameData = this.loadGameData();
-        if (!gameData.players) gameData.players = {};
-        
-        gameData.players[this.currentPlayer] = {
-            name: this.currentPlayer,
-            score: 0,
-            cardsInHand: 5,
-            cardsPlayed: 0,
-            lastSeen: Date.now()
-        };
-        
-        this.saveGameData(gameData);
     }
 
     // === UTILITY FUNCTIONS ===
@@ -299,142 +385,8 @@ class GameState {
         });
     }
 
-    isNameTaken(name) {
-        const gameData = this.loadGameData();
-        const player = gameData.players?.[name];
-        
-        // If player exists, check if they're still active (seen in last 30 seconds)
-        if (player) {
-            const timeSinceLastSeen = Date.now() - player.lastSeen;
-            if (timeSinceLastSeen > 30000) {
-                // Player is inactive, remove them and allow name reuse
-                delete gameData.players[name];
-                delete gameData.hands?.[name];
-                this.saveGameData(gameData);
-                return false;
-            }
-            return true; // Player is still active
-        }
-        
-        return false; // Name is available
-    }
-
     getOtherPlayers() {
-        const gameData = this.loadGameData();
-        return Object.keys(gameData.players || {}).filter(name => name !== this.currentPlayer);
-    }
-
-    // === MESSAGING ===
-
-    broadcastMessage(text) {
-        const gameData = this.loadGameData();
-        if (!gameData.messages) gameData.messages = [];
-        
-        gameData.messages.push({
-            text,
-            timestamp: Date.now(),
-            player: this.currentPlayer
-        });
-        
-        // Keep only last 10 messages
-        gameData.messages = gameData.messages.slice(-10);
-        this.saveGameData(gameData);
-    }
-
-    checkMessages() {
-        const gameData = this.loadGameData();
-        
-        // Check for reset notification
-        if (gameData.resetNotification) {
-            const resetNotification = gameData.resetNotification;
-            const resetTime = Date.now() - resetNotification.timestamp;
-            
-            // If reset happened recently and we didn't trigger it
-            if (resetTime < 5000 && resetNotification.resetBy !== this.currentPlayer) {
-                this.showMessage(`${resetNotification.resetBy} reset the game for everyone!`, 'info');
-                setTimeout(() => {
-                    localStorage.removeItem(this.gameId);
-                    location.reload();
-                }, 1000);
-                return;
-            }
-        }
-        
-        // Check regular messages
-        const newMessages = (gameData.messages || []).filter(msg => 
-            msg.player !== this.currentPlayer && msg.timestamp > this.lastMessageCheck
-        );
-
-        newMessages.forEach(msg => this.showMessage(msg.text, 'info'));
-        if (newMessages.length) this.lastMessageCheck = Date.now();
-    }
-
-    // === MULTIPLAYER SYNC ===
-
-    startPolling() {
-        setInterval(() => {
-            if (this.gameStarted && this.currentPlayer) {
-                this.saveMyData();
-                this.updateOtherPlayersDisplay();
-                this.checkMessages();
-            } else {
-                this.updateWelcomeDisplay();
-            }
-        }, 1000);
-    }
-
-    updateOtherPlayersDisplay() {
-        const gameData = this.loadGameData();
-        
-        // Debug logging
-        console.log('updateOtherPlayersDisplay called');
-        console.log('Current player:', this.currentPlayer);
-        console.log('Game data players:', gameData.players);
-        
-        // Clean up inactive players (not seen in last 30 seconds)
-        const now = Date.now();
-        Object.keys(gameData.players || {}).forEach(playerName => {
-            const player = gameData.players[playerName];
-            console.log(`Player ${playerName} last seen: ${now - player.lastSeen}ms ago`);
-            if (playerName !== this.currentPlayer && now - player.lastSeen > 30000) {
-                console.log(`Removing inactive player: ${playerName}`);
-                delete gameData.players[playerName];
-                delete gameData.hands?.[playerName];
-            }
-        });
-        this.saveGameData(gameData);
-        
-        const others = Object.values(gameData.players || {}).filter(p => p.name !== this.currentPlayer);
-        console.log('Other players:', others);
-        
-        const section = document.getElementById('other-players-section');
-        const container = document.getElementById('other-players-list');
-        
-        if (!others.length) {
-            console.log('No other players, hiding section');
-            section.style.display = 'none';
-            return;
-        }
-
-        console.log('Showing other players section with', others.length, 'players');
-        section.style.display = 'block';
-        container.innerHTML = others.map(player => `
-            <div class="other-player">
-                <div class="player-info">
-                    <div class="player-name-display">${player.name}</div>
-                    <div class="player-stats">Score: ${player.score} • Played: ${player.cardsPlayed}</div>
-                </div>
-                <div class="player-card-count">${player.cardsInHand} cards</div>
-            </div>
-        `).join('');
-
-        document.getElementById('players-online-game').textContent = Object.keys(gameData.players).length;
-    }
-
-    updateWelcomeDisplay() {
-        const gameData = this.loadGameData();
-        const count = Object.keys(gameData.players || {}).length;
-        document.getElementById('players-online').textContent = `${count} player(s) online`;
+        return Object.keys(this.players || {}).filter(name => name !== this.currentPlayer);
     }
 
     // === DISPLAY FUNCTIONS ===
@@ -484,6 +436,51 @@ class GameState {
         document.getElementById('cards-in-hand').textContent = this.playerHand.length;
     }
 
+    updateOtherPlayersDisplay() {
+        const others = Object.values(this.players || {}).filter(p => p.name !== this.currentPlayer);
+        
+        const section = document.getElementById('other-players-section');
+        const container = document.getElementById('other-players-list');
+        
+        if (!others.length) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+    updateOtherPlayersDisplay() {
+        const others = Object.values(this.players || {}).filter(p => p.name !== this.currentPlayer);
+        
+        const section = document.getElementById('other-players-section');
+        const container = document.getElementById('other-players-list');
+        
+        if (!others.length) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+        container.innerHTML = others.map(player => `
+            <div class="other-player">
+                <div class="player-info">
+                    <div class="player-name-display">${player.name}</div>
+                    <div class="player-stats">Score: ${player.score} • Played: ${player.cardsPlayed}</div>
+                </div>
+                <div class="player-card-count">${player.cardsInHand} cards</div>
+            </div>
+        `).join('');
+    }
+
+    updateOnlineCount() {
+        const count = Object.keys(this.players || {}).length;
+        document.getElementById('players-online-game').textContent = count;
+    }
+
+    updateWelcomeDisplay() {
+        const count = Object.keys(this.players || {}).length;
+        document.getElementById('players-online').textContent = `${count} player(s) online`;
+    }
+
     // === MODALS ===
 
     showActionModal(card) {
@@ -493,9 +490,8 @@ class GameState {
         document.getElementById('action-description').textContent = card.description;
         document.getElementById('target-selection').style.display = others.length ? 'block' : 'none';
         
-        const gameData = this.loadGameData();
         document.getElementById('target-buttons').innerHTML = others.map(playerName => {
-            const player = gameData.players[playerName];
+            const player = this.players[playerName];
             return `
                 <div class="target-player" onclick="game.selectTarget('${playerName}', this)">
                     <div>
@@ -601,31 +597,25 @@ class GameState {
 
     // === UTILITY ===
 
-    resetGame() {
+    async resetGame() {
         if (confirm('Reset game for everyone?')) {
-            // Send reset notification to all players
-            const gameData = this.loadGameData();
-            gameData.resetNotification = {
+            // Send reset notification
+            await database.ref('game/resetNotification').set({
                 resetBy: this.currentPlayer,
                 timestamp: Date.now()
-            };
-            this.saveGameData(gameData);
+            });
             
-            // Wait a moment for other players to see the notification
-            setTimeout(() => {
-                localStorage.removeItem(this.gameId);
+            // Clear all game data after a delay
+            setTimeout(async () => {
+                await database.ref('game').remove();
                 location.reload();
-            }, 500);
+            }, 2000);
         }
     }
 
-    leaveGame() {
-        // Clean up our player data when leaving
+    async leaveGame() {
         if (this.currentPlayer) {
-            const gameData = this.loadGameData();
-            delete gameData.players?.[this.currentPlayer];
-            delete gameData.hands?.[this.currentPlayer];
-            this.saveGameData(gameData);
+            await this.removePlayerData();
         }
         
         this.currentPlayer = null;
@@ -669,10 +659,18 @@ class GameState {
         document.getElementById('action-modal').onclick = (e) => {
             if (e.target.id === 'action-modal') this.closeActionModal();
         };
+
+        // Handle page unload to clean up player data
+        window.addEventListener('beforeunload', () => {
+            if (this.currentPlayer) {
+                // Use sendBeacon for reliable cleanup on page unload
+                navigator.sendBeacon && navigator.sendBeacon('/cleanup', JSON.stringify({
+                    player: this.currentPlayer
+                }));
+            }
+        });
     }
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    window.game = new GameState();
-});
+// Note: Game is now initialized from the HTML file after Firebase loads
