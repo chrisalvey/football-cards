@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Card Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Welcome Screen -->
+        <div id="welcome-screen" class="screen active">
+            <div class="logo">
+                <h1>🏈 Football Cards</h1>
+                <p>Watch the game, play your cards!</p>
+            </div>
+            
+            <div class="form-group">
+                <label for="player-name-welcome">Your Name:</label>
+                <input type="text" id="player-name-welcome" placeholder="Enter your name" maxlength="20">
+            </div>
+            
+            <div class="button-group">
+                <button id="join-game-btn" class="btn btn-primary">Join Game</button>
+                <button id="view-cards-btn" class="btn btn-secondary">View All Cards</button>
+            </div>
+            
+            <div id="game-status" class="setup-info" style="margin-top: 20px;">
+                <p id="players-online">Loading...</p>
+            </div>
+        </div>
+
+        <!-- Card Viewer Screen -->
+        <div id="card-viewer-screen" class="screen">
+            <h2>All Cards</h2>
+            <div id="cards-list"></div>
+            <div class="button-group">
+                <button id="back-to-welcome-cards" class="btn btn-secondary">Back</button>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="screen">
+            <div class="setup-info">
+                <h2 id="game-player-name">Player</h2>
+            </div>
+
+            <!-- Game Stats -->
+            <div class="game-stats">
+                <div class="stats-row">
+                    <span class="stat-label">Your Score:</span>
+                    <span class="stat-value" id="current-score">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stat-label">Cards Played:</span>
+                    <span class="stat-value" id="cards-played">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stat-label">Cards in Hand:</span>
+                    <span class="stat-value" id="cards-in-hand">5</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stat-label">Players Online:</span>
+                    <span class="stat-value" id="players-online-game">1</span>
+                </div>
+            </div>
+
+            <!-- Other Players Section -->
+            <div id="other-players-section" class="hand-section" style="display: none;">
+                <h3>Other Players</h3>
+                <div id="other-players-list"></div>
+            </div>
+
+            <!-- Undo Section -->
+            <div class="undo-section">
+                <button id="undo-btn" class="btn btn-undo" disabled>↶ Undo Last Play</button>
+            </div>
+
+            <!-- Player Hand -->
+            <div class="hand-section">
+                <h3>Your Cards</h3>
+                <div id="player-hand" class="hand-cards"></div>
+            </div>
+
+            <!-- Hold Cards Section -->
+            <div class="hold-cards-section" id="hold-cards-section" style="display: none;">
+                <h3>Hold Cards (Active Effects)</h3>
+                <div id="hold-cards" class="hold-cards"></div>
+            </div>
+            
+            <div class="button-group">
+                <button id="new-game-btn" class="btn btn-primary">Leave Game</button>
+                <button id="reset-for-everyone-btn" class="btn btn-danger">🔄 Reset Game for Everyone</button>
+                <button id="back-to-menu-btn" class="btn btn-secondary">Back to Menu</button>
+            </div>
+        </div>
+
+        <!-- Action Card Modal -->
+        <div id="action-modal" class="modal">
+            <div class="modal-content">
+                <h3 id="action-title">Action Card</h3>
+                <p id="action-description">Description</p>
+                
+                <div id="target-selection" class="target-selection" style="display: none;">
+                    <p><strong>Choose target:</strong></p>
+                    <div id="target-buttons"></div>
+                </div>
+
+                <div class="button-group">
+                    <button id="action-confirm" class="btn btn-primary">Confirm</button>
+                    <button id="action-cancel" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reset Game Confirmation Modal -->
+        <div id="reset-modal" class="modal">
+            <div class="modal-content">
+                <h3 style="color: #f44336;">⚠️ Reset Game for Everyone</h3>
+                <p><strong>This will completely reset the game for ALL players!</strong></p>
+                <p>Everyone will be returned to the welcome screen and all progress will be lost.</p>
+                
+                <div style="background: rgba(244,67,54,0.2); padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid rgba(244,67,54,0.3);">
+                    <p style="margin: 0; font-weight: 600;">This action cannot be undone!</p>
+                </div>
+
+                <div class="button-group">
+                    <button id="reset-confirm" class="btn btn-danger">Yes, Reset for Everyone</button>
+                    <button id="reset-cancel" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error/Success Messages -->
+        <div id="message-container" class="message-container"></div>
+    </div>
+
+    <!-- External JavaScript Files -->
+    <script src="cards.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
