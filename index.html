@@ -168,14 +168,6 @@
                 
                 console.log('Firebase initialized successfully');
                 
-                // Initialize game after Firebase is ready
-                if (typeof GameState !== 'undefined') {
-                    window.game = new GameState();
-                    console.log('Game initialized successfully');
-                } else {
-                    console.error('GameState class not found');
-                }
-                
             } catch (error) {
                 console.error('Firebase initialization error:', error);
                 alert('Error initializing Firebase: ' + error.message);
@@ -186,5 +178,25 @@
     <!-- External JavaScript Files -->
     <script src="cards.js"></script>
     <script src="game.js"></script>
+    
+    <!-- Initialize Game After Everything Loads -->
+    <script>
+        // Make sure everything is loaded before starting
+        window.addEventListener('load', function() {
+            // Add small delay to ensure all scripts are parsed
+            setTimeout(function() {
+                try {
+                    if (typeof GameState !== 'undefined') {
+                        window.game = new GameState();
+                        console.log('Game initialized successfully');
+                    } else {
+                        console.error('GameState class not found - check game.js for syntax errors');
+                    }
+                } catch (error) {
+                    console.error('Error creating game:', error);
+                }
+            }, 100);
+        });
+    </script>
 </body>
 </html>
