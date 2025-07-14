@@ -135,19 +135,23 @@
         <div id="message-container" class="message-container"></div>
     </div>
 
-    <!-- Firebase SDK (Alternative CDN) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- External JavaScript Files -->
+    <script src="cards.js"></script>
+    <script src="game.js"></script>
     
-    <!-- Your Firebase Config -->
+    <!-- Initialize Game -->
     <script>
-        // Wait for Firebase to load, then initialize
         window.addEventListener('load', function() {
+            console.log('Page loaded, initializing game...');
             try {
-                // Check if Firebase loaded
-                if (typeof firebase === 'undefined') {
-                    console.error('Firebase failed to load');
-                    alert('Firebase failed to load. Please refresh the page.');
+                window.game = new GameState();
+                console.log('Game initialized successfully!');
+            } catch (error) {
+                console.error('Error initializing game:', error);
+                alert('Game failed to initialize: ' + error.message);
+            }
+        });
+    </script>alert('Firebase failed to load. Please refresh the page.');
                     return;
                 }
                 
