@@ -105,6 +105,7 @@ GameState.prototype.startPolling = function() {
 
 GameState.prototype.syncWithOthers = function() {
     var data = this.loadSharedData();
+    console.log('🔄 Syncing with others. Current data:', data);
     
     // Update our player info
     if (!data.players) data.players = {};
@@ -120,10 +121,14 @@ GameState.prototype.syncWithOthers = function() {
     
     data.hands[this.currentPlayer] = this.playerHand.slice();
     
+    console.log('💾 Saving updated data:', data);
     this.saveSharedData(data);
     
     // Update display with other players
     this.players = data.players;
+    console.log('👥 Current players:', this.players);
+    console.log('🎯 Other players:', this.getOtherPlayers());
+    
     this.updateOtherPlayersDisplay();
     this.checkForMessages(data.messages || []);
 };
@@ -483,22 +488,34 @@ GameState.prototype.updateOtherPlayersDisplay = function() {
     var self = this;
     var others = [];
     
+    console.log('🔍 Updating other players display');
+    console.log('📊 All players:', this.players);
+    console.log('🎯 Current player:', this.currentPlayer);
+    
     for (var name in this.players) {
         if (name !== this.currentPlayer) {
             others.push(this.players[name]);
+            console.log('➕ Found other player:', name, this.players[name]);
         }
     }
+    
+    console.log('👥 Other players array:', others);
     
     var section = document.getElementById('other-players-section');
     var container = document.getElementById('other-players-list');
     
-    if (!section || !container) return;
+    if (!section || !container) {
+        console.error('❌ Missing DOM elements for other players');
+        return;
+    }
     
     if (others.length === 0) {
+        console.log('🚫 No other players found, hiding section');
         section.style.display = 'none';
         return;
     }
     
+    console.log('✅ Showing', others.length, 'other players');
     section.style.display = 'block';
     container.innerHTML = '';
     
@@ -508,11 +525,15 @@ GameState.prototype.updateOtherPlayersDisplay = function() {
         div.className = 'other-player';
         div.innerHTML = '<div class="player-info"><div class="player-name-display">' + player.name + '</div><div class="player-stats">Score: ' + player.score + ' • Played: ' + player.cardsPlayed + '</div></div><div class="player-card-count">' + player.cardsInHand + ' cards</div>';
         container.appendChild(div);
+        console.log('🎪 Added player to display:', player.name);
     }
     
     // Update online count
     var onlineEl = document.getElementById('players-online-game');
-    if (onlineEl) onlineEl.textContent = Object.keys(this.players).length;
+    if (onlineEl) {
+        onlineEl.textContent = Object.keys(this.players).length;
+        console.log('📊 Updated online count:', Object.keys(this.players).length);
+    }
 };
 
 GameState.prototype.updateWelcomeDisplay = function() {
