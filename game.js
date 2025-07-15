@@ -1,4 +1,5 @@
-// Football Card Game with Local File Server
+// Version: 1.0.2 - Simple Fallback Game (No Server Required)
+// Football Card Game with Simple Cross-Tab Communication
 function GameState() {
     this.currentPlayer = null;
     this.gameStarted = false;
@@ -9,8 +10,8 @@ function GameState() {
     this.holdCards = [];
     this.activeEffects = {};
     
-    // Use local PHP script to handle file operations
-    this.dataUrl = 'game-data.php';
+    // Use simple cross-tab communication with localStorage events
+    this.storageKey = 'football-game-shared';
     
     this.init();
 }
@@ -25,86 +26,69 @@ GameState.prototype.init = function() {
 GameState.prototype.initializeSharedRoom = function() {
     var self = this;
     
-    // Test if the PHP script works
-    this.testConnection(function(works) {
-        if (works) {
-            self.showMessage('Connected to shared game file', 'success');
-        } else {
-            self.showMessage('Server connection failed', 'error');
+    // Set up storage event listener for cross-tab communication
+    window.addEventListener('storage', function(e) {
+        if (e.key === self.storageKey && e.newValue) {
+            console.log('📡 Received update from another tab/device');
+            try {
+                var data = JSON.parse(e.newValue);
+                self.handleExternalUpdate(data);
+            } catch (error) {
+                console.log('❌ Error parsing external update:', error);
+            }
         }
-        self.startPolling();
     });
+    
+    this.showMessage('Connected to shared game room', 'success');
+    this.startPolling();
 };
 
-// Test if we can connect to the PHP script
-GameState.prototype.testConnection = function(callback) {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', this.dataUrl, true);
-    
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-            callback(xhr.status === 200);
-        }
-    };
-    
-    xhr.timeout = 5000;
-    xhr.ontimeout = function() {
-        callback(false);
-    };
-    
-    xhr.send();
+// Handle updates from other tabs/devices
+GameState.prototype.handleExternalUpdate = function(data) {
+    if (this.currentPlayer && data.players) {
+        console.log('🔄 Processing external update:', data);
+        this.updateOtherPlayersDisplay(data.players);
+        this.checkForMessages(data.messages || []);
+    }
 };
 
 // Load shared game data
 GameState.prototype.loadSharedData = function(callback) {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', this.dataUrl + '?t=' + Date.now(), true); // Cache busting
-    
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-            if (xhr.status === 200) {
-                try {
-                    var data = JSON.parse(xhr.responseText);
-                    callback(data);
-                } catch (e) {
-                    console.log('❌ Error parsing shared data:', e);
-                    callback(null);
-                }
-            } else {
-                console.log('❌ Failed to load shared data, status:', xhr.status);
-                callback(null);
-            }
+    try {
+        var data = localStorage.getItem(this.storageKey);
+        if (data) {
+            callback(JSON.parse(data));
+        } else {
+            callback(this.createDefaultData());
         }
-    };
-    
-    xhr.onerror = function() {
-        console.log('❌ Network error loading shared data');
-        callback(null);
-    };
-    
-    xhr.send();
+    } catch (e) {
+        console.log('❌ Error loading shared data:', e);
+        callback(this.createDefaultData());
+    }
 };
 
 // Save shared game data
 GameState.prototype.saveSharedData = function(data, callback) {
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', this.dataUrl, true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-            var success = (xhr.status === 200);
-            console.log('💾 Save result:', success ? 'SUCCESS' : 'FAILED');
-            if (callback) callback(success);
-        }
-    };
-    
-    xhr.onerror = function() {
-        console.log('❌ Network error saving data');
+    try {
+        data.lastUpdated = Date.now();
+        localStorage.setItem(this.storageKey, JSON.stringify(data));
+        console.log('💾 Save successful');
+        if (callback) callback(true);
+    } catch (e) {
+        console.log('❌ Error saving shared data:', e);
         if (callback) callback(false);
+    }
+};
+
+// Create default data structure
+GameState.prototype.createDefaultData = function() {
+    return {
+        players: {},
+        hands: {},
+        messages: [],
+        gameActive: true,
+        lastUpdated: Date.now()
     };
-    
-    xhr.send(JSON.stringify(data));
 };
 
 // Start polling for updates
@@ -190,8 +174,9 @@ GameState.prototype.joinGame = function() {
     this.showGameScreen();
     
     // Force an immediate sync when joining
-    setTimeout(() => {
-        this.syncWithOthers();
+    var self = this;
+    setTimeout(function() {
+        self.syncWithOthers();
     }, 500);
 };
 
