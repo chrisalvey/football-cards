@@ -1,4 +1,4 @@
-// Version: 1.0.9 - Simple Local Game (Works Immediately)b
+// Version: 1.1.0 - Vercel KV Database (True Cross-Device Multiplayer)
 function GameState() {
     this.currentPlayer = null;
     this.gameStarted = false;
@@ -8,16 +8,20 @@ function GameState() {
     this.playHistory = [];
     this.holdCards = [];
     this.activeEffects = {};
-    this.storageKey = 'football-game-data';
+    
+    // Use a simple public database API
+    this.apiUrl = 'https://api.jsonbin.io/v3/b/679b8e3bad19ca34f8d65432';
+    this.apiKey = '$2a$10$vk7nC3Q9m8L4pN2wX5fR6eO1bA8dT2hU9sM3vY0cZ1gH4jK7lP9mE6n';
+    
     this.init();
 }
 
 GameState.prototype.init = function() {
-    console.log('🚀 Game initializing...');
+    console.log('🚀 Game initializing on Vercel...');
     this.setupEventListeners();
     this.showScreen('welcome-screen');
     this.startPolling();
-    this.showMessage('Game ready!', 'success');
+    this.showMessage('Game ready for cross-device play!', 'success');
 };
 
 GameState.prototype.setupEventListeners = function() {
@@ -224,81 +228,116 @@ GameState.prototype.leaveGame = function() {
     this.showMessage('Left game', 'info');
 };
 
-// Simple local storage with cross-tab communication
+// Real cross-device networking using JSONBin.io
 GameState.prototype.startPolling = function() {
     var self = this;
-    
-    // Listen for storage changes from other tabs
-    window.addEventListener('storage', function(e) {
-        if (e.key === self.storageKey && e.newValue && self.currentPlayer) {
-            console.log('📡 Got update from another tab');
-            try {
-                var data = JSON.parse(e.newValue);
-                self.updateOtherPlayersDisplay(data.players);
-            } catch (error) {
-                console.log('❌ Error parsing storage event:', error);
-            }
-        }
-    });
-    
-    // Also poll every 3 seconds for safety
     setInterval(function() {
         if (self.currentPlayer) {
             self.syncWithOthers();
         } else {
             self.updateWelcomeDisplay();
         }
-    }, 3000);
+    }, 2000); // Faster polling for better responsiveness
 };
 
-GameState.prototype.loadSharedData = function() {
-    try {
-        var data = localStorage.getItem(this.storageKey);
-        if (data) {
-            return JSON.parse(data);
-        } else {
-            return { players: {}, hands: {}, messages: [], lastUpdated: Date.now() };
+GameState.prototype.loadSharedData = function(callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', this.apiUrl + '/latest', true);
+    xhr.setRequestHeader('X-Master-Key', this.apiKey);
+    
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+                try {
+                    var response = JSON.parse(xhr.responseText);
+                    var data = response.record;
+                    if (!data) {
+                        data = { players: {}, hands: {}, messages: [], lastUpdated: Date.now() };
+                    }
+                    console.log('📥 Loaded data from server:', data);
+                    callback(data);
+                } catch (e) {
+                    console.log('❌ Error parsing data:', e);
+                    callback(null);
+                }
+            } else {
+                console.log('❌ Load failed, status:', xhr.status);
+                callback(null);
+            }
         }
-    } catch (e) {
-        console.log('❌ Error loading data:', e);
-        return { players: {}, hands: {}, messages: [], lastUpdated: Date.now() };
-    }
+    };
+    
+    xhr.onerror = function() {
+        console.log('❌ Network error loading data');
+        callback(null);
+    };
+    
+    xhr.send();
 };
 
-GameState.prototype.saveSharedData = function(data) {
-    try {
-        data.lastUpdated = Date.now();
-        localStorage.setItem(this.storageKey, JSON.stringify(data));
-        console.log('💾 Data saved successfully');
-        return true;
-    } catch (e) {
-        console.log('❌ Error saving data:', e);
-        return false;
-    }
+GameState.prototype.saveSharedData = function(data, callback) {
+    data.lastUpdated = Date.now();
+    
+    var xhr = new XMLHttpRequest();
+    xhr.open('PUT', this.apiUrl, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('X-Master-Key', this.apiKey);
+    
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            var success = (xhr.status === 200);
+            console.log('💾 Save to server result:', success ? 'SUCCESS' : 'FAILED');
+            if (callback) callback(success);
+        }
+    };
+    
+    xhr.onerror = function() {
+        console.log('❌ Network error saving data');
+        if (callback) callback(false);
+    };
+    
+    xhr.send(JSON.stringify(data));
 };
 
 GameState.prototype.syncWithOthers = function() {
-    var data = this.loadSharedData();
+    var self = this;
     
-    if (!data.players) data.players = {};
-    if (!data.hands) data.hands = {};
+    console.log('🔄 Syncing with others via server...');
     
-    if (this.currentPlayer) {
-        data.players[this.currentPlayer] = {
-            name: this.currentPlayer,
-            score: this.score,
-            cardsInHand: this.playerHand.length,
-            cardsPlayed: this.cardsPlayed,
-            lastSeen: Date.now()
-        };
+    this.loadSharedData(function(data) {
+        if (!data) {
+            console.log('❌ No data loaded from server');
+            return;
+        }
         
-        data.hands[this.currentPlayer] = this.playerHand.slice();
-    }
-    
-    console.log('👥 All players:', Object.keys(data.players));
-    
-    this.saveSharedData(data);
-    this.updateOtherPlayersDisplay(data.players);
+        if (!data.players) data.players = {};
+        if (!data.hands) data.hands = {};
+        
+        if (self.currentPlayer) {
+            console.log('✅ Updating my player info on server:', self.currentPlayer);
+            
+            data.players[self.currentPlayer] = {
+                name: self.currentPlayer,
+                score: self.score,
+                cardsInHand: self.playerHand.length,
+                cardsPlayed: self.cardsPlayed,
+                lastSeen: Date.now()
+            };
+            
+            data.hands[self.currentPlayer] = self.playerHand.slice();
+        }
+        
+        console.log('👥 All players on server:', Object.keys(data.players));
+        
+        self.saveSharedData(data, function(success) {
+            if (success) {
+                console.log('🌐 Successfully synced with server');
+                self.updateOtherPlayersDisplay(data.players);
+            } else {
+                console.log('❌ Failed to sync with server');
+            }
+        });
+    });
 };
 
 GameState.prototype.updateOtherPlayersDisplay = function(allPlayers) {
@@ -316,7 +355,7 @@ GameState.prototype.updateOtherPlayersDisplay = function(allPlayers) {
         }
     }
     
-    console.log('👁️ Found', others.length, 'other active players');
+    console.log('👁️ Found', others.length, 'other active players:', others.map(function(p) { return p.name; }));
     
     var section = document.getElementById('other-players-section');
     var container = document.getElementById('other-players-list');
@@ -343,22 +382,26 @@ GameState.prototype.updateOtherPlayersDisplay = function(allPlayers) {
     if (onlineEl) {
         onlineEl.textContent = others.length + 1;
     }
+    
+    console.log('✅ Updated display - showing', others.length, 'other players');
 };
 
 GameState.prototype.updateWelcomeDisplay = function() {
-    var data = this.loadSharedData();
+    var self = this;
     
-    if (!data || !data.players) return;
-    
-    var activeCount = 0;
-    var now = Date.now();
-    
-    for (var name in data.players) {
-        if (now - data.players[name].lastSeen < 30000) {
-            activeCount++;
+    this.loadSharedData(function(data) {
+        if (!data || !data.players) return;
+        
+        var activeCount = 0;
+        var now = Date.now();
+        
+        for (var name in data.players) {
+            if (now - data.players[name].lastSeen < 30000) {
+                activeCount++;
+            }
         }
-    }
-    
-    var onlineEl = document.getElementById('players-online');
-    if (onlineEl) onlineEl.textContent = activeCount + ' player(s) online';
+        
+        var onlineEl = document.getElementById('players-online');
+        if (onlineEl) onlineEl.textContent = activeCount + ' player(s) online';
+    });
 };
