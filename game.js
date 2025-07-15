@@ -1,4 +1,4 @@
-// Simple Football Card Game with File-Based Shared Data
+// Football Card Game with Real Cross-Device Sharing
 function GameState() {
     this.currentPlayer = null;
     this.gameStarted = false;
@@ -9,9 +9,8 @@ function GameState() {
     this.holdCards = [];
     this.activeEffects = {};
     
-    // Use a simple shared file - NO JSONBin.io
-    this.dataFile = 'shared-data.json';
-    this.useFallback = false;
+    // Use Firebase Realtime Database (free tier)
+    this.databaseUrl = 'https://football-cards-default-rtdb.firebaseio.com/game.json';
     
     this.init();
 }
@@ -26,41 +25,54 @@ GameState.prototype.init = function() {
 GameState.prototype.initializeSharedRoom = function() {
     var self = this;
     
-    // Test if we can load the shared file
-    this.loadSharedData(function(data) {
-        if (data) {
-            self.showMessage('Connected to game room', 'success');
+    // Test connection and start polling
+    this.testConnection(function(works) {
+        if (works) {
+            self.showMessage('Connected to shared game room', 'success');
         } else {
-            self.showMessage('Using local mode for testing', 'info');
-            self.useFallback = true;
+            self.showMessage('Using local storage for testing', 'info');
         }
         self.startPolling();
     });
 };
 
-// Load shared game data - NO JSONBin.io here
-GameState.prototype.loadSharedData = function(callback) {
-    if (this.useFallback) {
-        // Use localStorage as fallback
-        try {
-            var data = localStorage.getItem('football-shared-game');
-            callback(data ? JSON.parse(data) : this.createDefaultData());
-        } catch (e) {
-            callback(this.createDefaultData());
-        }
-        return;
-    }
-    
-    // Try to load the shared-data.json file
+// Test if we can connect to the shared database
+GameState.prototype.testConnection = function(callback) {
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', this.dataFile + '?t=' + Date.now(), true); // Cache busting
+    xhr.open('GET', this.databaseUrl, true);
+    
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            callback(xhr.status === 200);
+        }
+    };
+    
+    xhr.timeout = 5000;
+    xhr.ontimeout = function() {
+        callback(false);
+    };
+    
+    xhr.send();
+};
+
+// Load shared game data
+GameState.prototype.loadSharedData = function(callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', this.databaseUrl + '?timestamp=' + Date.now(), true);
     
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
             if (xhr.status === 200) {
                 try {
                     var data = JSON.parse(xhr.responseText);
-                    callback(data);
+                    // Firebase returns null for empty data
+                    callback(data || {
+                        players: {},
+                        hands: {},
+                        messages: [],
+                        gameActive: true,
+                        lastUpdated: Date.now()
+                    });
                 } catch (e) {
                     console.log('❌ Error parsing shared data:', e);
                     callback(null);
@@ -80,54 +92,42 @@ GameState.prototype.loadSharedData = function(callback) {
     xhr.send();
 };
 
-// Save shared game data - NO JSONBin.io here either
+// Save shared game data
 GameState.prototype.saveSharedData = function(data, callback) {
-    if (this.useFallback) {
-        // Use localStorage as fallback
-        try {
-            data.lastUpdated = Date.now();
-            localStorage.setItem('football-shared-game', JSON.stringify(data));
-            if (callback) callback(true);
-        } catch (e) {
-            if (callback) callback(false);
-        }
-        return;
-    }
+    data.lastUpdated = Date.now();
     
-    // In a real implementation, this would save to a server
-    // For now, we'll just simulate success and rely on polling to load updates
-    console.log('💾 Would save data:', data);
-    if (callback) callback(true);
-};
-
-// Create default data structure
-GameState.prototype.createDefaultData = function() {
-    return {
-        players: {},
-        hands: {},
-        messages: [],
-        gameActive: true,
-        lastUpdated: Date.now()
+    var xhr = new XMLHttpRequest();
+    xhr.open('PUT', this.databaseUrl, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            var success = (xhr.status === 200);
+            console.log('💾 Save result:', success ? 'SUCCESS' : 'FAILED');
+            if (callback) callback(success);
+        }
     };
+    
+    xhr.onerror = function() {
+        console.log('❌ Network error saving data');
+        if (callback) callback(false);
+    };
+    
+    xhr.send(JSON.stringify(data));
 };
 
 // Start polling for updates
 GameState.prototype.startPolling = function() {
     var self = this;
     
-    // Update every 3 seconds
+    // Update every 2 seconds for better responsiveness
     setInterval(function() {
         if (self.currentPlayer) {
             self.syncWithOthers();
-        }
-    }, 3000);
-    
-    // Update welcome screen
-    setInterval(function() {
-        if (!self.currentPlayer) {
+        } else {
             self.updateWelcomeDisplay();
         }
-    }, 5000);
+    }, 2000);
 };
 
 // Sync with other players
@@ -140,17 +140,20 @@ GameState.prototype.syncWithOthers = function() {
         console.log('📊 Loaded shared data:', data);
         
         if (!data) {
-            console.log('❌ No shared data loaded');
-            return;
+            console.log('❌ No shared data loaded - using fallback');
+            // Use localStorage as fallback
+            data = JSON.parse(localStorage.getItem('football-fallback') || '{"players":{},"hands":{},"messages":[]}');
         }
         
-        // Update my info
+        // Ensure data structure exists
         if (!data.players) data.players = {};
         if (!data.hands) data.hands = {};
+        if (!data.messages) data.messages = [];
         
         if (self.currentPlayer) {
             console.log('✅ Updating my player info:', self.currentPlayer);
             
+            // Update my player data
             data.players[self.currentPlayer] = {
                 name: self.currentPlayer,
                 score: self.score,
@@ -166,19 +169,20 @@ GameState.prototype.syncWithOthers = function() {
         
         // Save updated data
         self.saveSharedData(data, function(success) {
-            console.log('💾 Save successful:', success);
-            
-            if (success) {
-                // Update display with other players
-                console.log('🎮 Updating display with players:', data.players);
-                self.updateOtherPlayersDisplay(data.players);
-                self.checkForMessages(data.messages || []);
+            if (!success) {
+                // Fallback to localStorage
+                localStorage.setItem('football-fallback', JSON.stringify(data));
             }
+            
+            // Update display regardless
+            console.log('🎮 Updating display with players:', data.players);
+            self.updateOtherPlayersDisplay(data.players);
+            self.checkForMessages(data.messages || []);
         });
     });
 };
 
-// Join the game - no room checks needed since there's only one shared room
+// Join the game
 GameState.prototype.joinGame = function() {
     var nameInput = document.getElementById('player-name-welcome');
     var name = nameInput.value.trim();
@@ -198,6 +202,11 @@ GameState.prototype.joinGame = function() {
     
     this.startNewHand();
     this.showGameScreen();
+    
+    // Force an immediate sync when joining
+    setTimeout(() => {
+        this.syncWithOthers();
+    }, 500);
 };
 
 // Start new hand
@@ -240,6 +249,9 @@ GameState.prototype.playCard = function(index) {
     
     this.dealCards(1);
     this.updateDisplay();
+    
+    // Force sync after playing a card
+    this.syncWithOthers();
 };
 
 GameState.prototype.handleEventCard = function(card) {
@@ -448,15 +460,19 @@ GameState.prototype.updateOtherPlayersDisplay = function(allPlayers) {
     this.cachedPlayers = allPlayers; // Cache for other methods
     
     var others = [];
+    var now = Date.now();
+    
     for (var name in allPlayers) {
         if (name !== this.currentPlayer) {
-            // Check if player is still active (seen in last 60 seconds)
-            var timeSince = Date.now() - allPlayers[name].lastSeen;
-            if (timeSince < 60000) {
+            // Check if player is still active (seen in last 30 seconds)
+            var timeSince = now - allPlayers[name].lastSeen;
+            if (timeSince < 30000) {
                 others.push(allPlayers[name]);
             }
         }
     }
+    
+    console.log('👁️ Found', others.length, 'other active players:', others.map(p => p.name));
     
     var section = document.getElementById('other-players-section');
     var container = document.getElementById('other-players-list');
@@ -484,6 +500,8 @@ GameState.prototype.updateOtherPlayersDisplay = function(allPlayers) {
     if (onlineEl) {
         onlineEl.textContent = others.length + 1; // +1 for current player
     }
+    
+    console.log('✅ Updated display - showing', others.length, 'other players');
 };
 
 GameState.prototype.updateWelcomeDisplay = function() {
@@ -500,7 +518,7 @@ GameState.prototype.updateWelcomeDisplay = function() {
         var now = Date.now();
         
         for (var name in data.players) {
-            if (now - data.players[name].lastSeen < 60000) {
+            if (now - data.players[name].lastSeen < 30000) {
                 activeCount++;
             }
         }
@@ -514,7 +532,7 @@ GameState.prototype.updateWelcomeDisplay = function() {
 GameState.prototype.checkForMessages = function(messages) {
     if (!messages) return;
     
-    if (!this.lastMessageCheck) this.lastMessageCheck = Date.now();
+    if (!this.lastMessageCheck) this.lastMessageCheck = Date.now() - 5000; // Look back 5 seconds on first check
     
     for (var i = 0; i < messages.length; i++) {
         var msg = messages[i];
@@ -526,6 +544,7 @@ GameState.prototype.checkForMessages = function(messages) {
     this.lastMessageCheck = Date.now();
 };
 
+// Rest of the methods stay the same...
 GameState.prototype.undoLastPlay = function() {
     if (this.playHistory.length === 0) return;
     
@@ -759,7 +778,7 @@ GameState.prototype.showMessage = function(text, type) {
     }, 3000);
 };
 
-// Event listeners - NO room creation buttons
+// Event listeners
 GameState.prototype.setupEventListeners = function() {
     var self = this;
     
