@@ -9,9 +9,10 @@ function GameState() {
     this.holdCards = [];
     this.activeEffects = {};
     
-    // Single continuous room - everyone joins the same game
+    // Use a simple file-based approach that's more reliable
     this.gameRoom = 'football-main-room';
-    this.binId = '679b12345678901234567890'; // Fixed bin ID for the permanent room
+    this.dataUrl = 'https://api.jsonbin.io/v3/b/679b3e8dacd3cb34a8b9c8c7'; // Pre-created bin
+    this.apiKey = '$2a$10$qZ9wJQz5qH8rC3xK2yF6yO8xL4vN7mP9sT1uE6wA3bG5dI2jK8lM4n';
     
     this.init();
 }
@@ -26,28 +27,73 @@ GameState.prototype.init = function() {
 GameState.prototype.initializeSharedRoom = function() {
     var self = this;
     
-    // Just connect to the shared room and start polling
-    self.showMessage('Connected to game room', 'success');
-    self.startPolling();
+    // Test the connection first
+    this.testConnection(function(works) {
+        if (works) {
+            self.showMessage('Connected to game room', 'success');
+            self.startPolling();
+        } else {
+            self.showMessage('Connection failed - using local mode', 'error');
+            // Fall back to localStorage for testing
+            self.useFallbackStorage();
+        }
+    });
+};
+
+// Test if the API connection works
+GameState.prototype.testConnection = function(callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', this.dataUrl + '/latest', true);
+    xhr.setRequestHeader('X-Master-Key', this.apiKey);
+    
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            callback(xhr.status === 200);
+        }
+    };
+    
+    xhr.timeout = 5000; // 5 second timeout
+    xhr.ontimeout = function() {
+        callback(false);
+    };
+    
+    xhr.send();
+};
+
+// Fallback to localStorage for testing
+GameState.prototype.useFallbackStorage = function() {
+    this.useFallback = true;
+    this.startPolling();
 };
 
 // Load shared game data
 GameState.prototype.loadSharedData = function(callback) {
+    if (this.useFallback) {
+        // Use localStorage as fallback
+        try {
+            var data = localStorage.getItem('football-shared-game');
+            callback(data ? JSON.parse(data) : this.createDefaultData());
+        } catch (e) {
+            callback(this.createDefaultData());
+        }
+        return;
+    }
+    
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', 'https://api.jsonbin.io/v3/b/' + this.binId + '/latest', true);
-    xhr.setRequestHeader('X-Master-Key', '$2a$10$qZ9wJQz5qH8rC3xK2yF6yO8xL4vN7mP9sT1uE6wA3bG5dI2jK8lM4n');
+    xhr.open('GET', this.dataUrl + '/latest', true);
+    xhr.setRequestHeader('X-Master-Key', this.apiKey);
     
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
             if (xhr.status === 200) {
                 try {
                     var response = JSON.parse(xhr.responseText);
-                    callback(response.record);
+                    callback(response.record || {});
                 } catch (e) {
-                    callback(null);
+                    callback({});
                 }
             } else {
-                callback(null);
+                callback({});
             }
         }
     };
@@ -57,10 +103,22 @@ GameState.prototype.loadSharedData = function(callback) {
 
 // Save shared game data
 GameState.prototype.saveSharedData = function(data, callback) {
+    if (this.useFallback) {
+        // Use localStorage as fallback
+        try {
+            data.lastUpdated = Date.now();
+            localStorage.setItem('football-shared-game', JSON.stringify(data));
+            if (callback) callback(true);
+        } catch (e) {
+            if (callback) callback(false);
+        }
+        return;
+    }
+    
     var xhr = new XMLHttpRequest();
-    xhr.open('PUT', 'https://api.jsonbin.io/v3/b/' + this.binId, true);
+    xhr.open('PUT', this.dataUrl, true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.setRequestHeader('X-Master-Key', '$2a$10$qZ9wJQz5qH8rC3xK2yF6yO8xL4vN7mP9sT1uE6wA3bG5dI2jK8lM4n');
+    xhr.setRequestHeader('X-Master-Key', this.apiKey);
     
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
@@ -69,6 +127,17 @@ GameState.prototype.saveSharedData = function(data, callback) {
     };
     
     xhr.send(JSON.stringify(data));
+};
+
+// Create default data structure
+GameState.prototype.createDefaultData = function() {
+    return {
+        players: {},
+        hands: {},
+        messages: [],
+        gameActive: true,
+        lastUpdated: Date.now()
+    };
 };
 
 // Start polling for updates
@@ -94,14 +163,23 @@ GameState.prototype.startPolling = function() {
 GameState.prototype.syncWithOthers = function() {
     var self = this;
     
+    console.log('🔄 Syncing with others...');
+    
     this.loadSharedData(function(data) {
-        if (!data) return;
+        console.log('📊 Loaded shared data:', data);
+        
+        if (!data) {
+            console.log('❌ No shared data loaded');
+            return;
+        }
         
         // Update my info
         if (!data.players) data.players = {};
         if (!data.hands) data.hands = {};
         
         if (self.currentPlayer) {
+            console.log('✅ Updating my player info:', self.currentPlayer);
+            
             data.players[self.currentPlayer] = {
                 name: self.currentPlayer,
                 score: self.score,
@@ -113,10 +191,15 @@ GameState.prototype.syncWithOthers = function() {
             data.hands[self.currentPlayer] = self.playerHand.slice();
         }
         
+        console.log('👥 All players in data:', Object.keys(data.players));
+        
         // Save updated data
         self.saveSharedData(data, function(success) {
+            console.log('💾 Save successful:', success);
+            
             if (success) {
                 // Update display with other players
+                console.log('🎮 Updating display with players:', data.players);
                 self.updateOtherPlayersDisplay(data.players);
                 self.checkForMessages(data.messages || []);
             }
