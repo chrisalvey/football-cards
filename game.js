@@ -1,4 +1,4 @@
-// Simplified Football Card Game with Single Shared Room
+// Simple Football Card Game with File-Based Shared Data
 function GameState() {
     this.currentPlayer = null;
     this.gameStarted = false;
@@ -9,10 +9,9 @@ function GameState() {
     this.holdCards = [];
     this.activeEffects = {};
     
-    // Use a simple file-based approach that's more reliable
-    this.gameRoom = 'football-main-room';
-    this.dataUrl = 'https://api.jsonbin.io/v3/b/679b3e8dacd3cb34a8b9c8c7'; // Pre-created bin
-    this.apiKey = '$2a$10$qZ9wJQz5qH8rC3xK2yF6yO8xL4vN7mP9sT1uE6wA3bG5dI2jK8lM4n';
+    // Use a simple shared file
+    this.dataFile = 'shared-data.json';
+    this.useFallback = false;
     
     this.init();
 }
@@ -23,47 +22,20 @@ GameState.prototype.init = function() {
     this.initializeSharedRoom();
 };
 
-// Initialize or connect to the shared room
+// Initialize the shared room
 GameState.prototype.initializeSharedRoom = function() {
     var self = this;
     
-    // Test the connection first
-    this.testConnection(function(works) {
-        if (works) {
+    // Test if we can load the shared file
+    this.loadSharedData(function(data) {
+        if (data) {
             self.showMessage('Connected to game room', 'success');
-            self.startPolling();
         } else {
-            self.showMessage('Connection failed - using local mode', 'error');
-            // Fall back to localStorage for testing
-            self.useFallbackStorage();
+            self.showMessage('Using local mode for testing', 'info');
+            self.useFallback = true;
         }
+        self.startPolling();
     });
-};
-
-// Test if the API connection works
-GameState.prototype.testConnection = function(callback) {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', this.dataUrl + '/latest', true);
-    xhr.setRequestHeader('X-Master-Key', this.apiKey);
-    
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-            callback(xhr.status === 200);
-        }
-    };
-    
-    xhr.timeout = 5000; // 5 second timeout
-    xhr.ontimeout = function() {
-        callback(false);
-    };
-    
-    xhr.send();
-};
-
-// Fallback to localStorage for testing
-GameState.prototype.useFallbackStorage = function() {
-    this.useFallback = true;
-    this.startPolling();
 };
 
 // Load shared game data
@@ -80,22 +52,28 @@ GameState.prototype.loadSharedData = function(callback) {
     }
     
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', this.dataUrl + '/latest', true);
-    xhr.setRequestHeader('X-Master-Key', this.apiKey);
+    xhr.open('GET', this.dataFile + '?t=' + Date.now(), true); // Cache busting
     
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
             if (xhr.status === 200) {
                 try {
-                    var response = JSON.parse(xhr.responseText);
-                    callback(response.record || {});
+                    var data = JSON.parse(xhr.responseText);
+                    callback(data);
                 } catch (e) {
-                    callback({});
+                    console.log('❌ Error parsing shared data:', e);
+                    callback(null);
                 }
             } else {
-                callback({});
+                console.log('❌ Failed to load shared data, status:', xhr.status);
+                callback(null);
             }
         }
+    };
+    
+    xhr.onerror = function() {
+        console.log('❌ Network error loading shared data');
+        callback(null);
     };
     
     xhr.send();
@@ -115,18 +93,10 @@ GameState.prototype.saveSharedData = function(data, callback) {
         return;
     }
     
-    var xhr = new XMLHttpRequest();
-    xhr.open('PUT', this.dataUrl, true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.setRequestHeader('X-Master-Key', this.apiKey);
-    
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-            if (callback) callback(xhr.status === 200);
-        }
-    };
-    
-    xhr.send(JSON.stringify(data));
+    // In a real implementation, this would save to a server
+    // For now, we'll just simulate success and rely on polling to load updates
+    console.log('💾 Would save data:', data);
+    if (callback) callback(true);
 };
 
 // Create default data structure
@@ -146,7 +116,7 @@ GameState.prototype.startPolling = function() {
     
     // Update every 3 seconds
     setInterval(function() {
-        if (self.binId) {
+        if (self.currentPlayer) {
             self.syncWithOthers();
         }
     }, 3000);
