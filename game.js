@@ -1,4 +1,4 @@
-// Simplified Football Card Game with Shared Data
+// Simplified Football Card Game with Single Shared Room
 function GameState() {
     this.currentPlayer = null;
     this.gameStarted = false;
@@ -9,9 +9,9 @@ function GameState() {
     this.holdCards = [];
     this.activeEffects = {};
     
-    // Simple shared data using a public JSON store
-    this.gameRoom = 'football-game-' + (new URLSearchParams(window.location.search).get('room') || 'default');
-    this.binId = null; // Will be set when room is created/joined
+    // Single continuous room - everyone joins the same game
+    this.gameRoom = 'football-main-room';
+    this.binId = '679b12345678901234567890'; // Fixed bin ID for the permanent room
     
     this.init();
 }
@@ -19,35 +19,32 @@ function GameState() {
 GameState.prototype.init = function() {
     this.setupEventListeners();
     this.showScreen('welcome-screen');
-    this.checkForExistingRoom();
+    this.initializeSharedRoom();
 };
 
-// Check if there's already a room going
-GameState.prototype.checkForExistingRoom = function() {
+// Initialize or connect to the shared room
+GameState.prototype.initializeSharedRoom = function() {
     var self = this;
-    var roomData = localStorage.getItem('current-room-data');
     
-    if (roomData) {
-        try {
-            var data = JSON.parse(roomData);
-            self.binId = data.binId;
-            self.gameRoom = data.roomName;
-            document.getElementById('room-display').textContent = 'Room: ' + self.gameRoom;
+    // Try to load existing shared room data
+    this.loadSharedData(function(data) {
+        if (data) {
+            // Room exists, just connect
+            self.showMessage('Connected to game room', 'success');
             self.startPolling();
-        } catch (e) {
-            // Clear invalid data
-            localStorage.removeItem('current-room-data');
+        } else {
+            // Room doesn't exist, create it
+            self.createSharedRoom();
         }
-    }
+    });
 };
 
-// Create a new game room
-GameState.prototype.createRoom = function() {
+// Create the shared room if it doesn't exist
+GameState.prototype.createSharedRoom = function() {
     var self = this;
-    var roomName = this.generateRoomCode();
     
     var initData = {
-        roomName: roomName,
+        roomName: this.gameRoom,
         players: {},
         hands: {},
         messages: [],
@@ -60,7 +57,7 @@ GameState.prototype.createRoom = function() {
     xhr.open('POST', 'https://api.jsonbin.io/v3/b', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.setRequestHeader('X-Master-Key', '$2a$10$qZ9wJQz5qH8rC3xK2yF6yO8xL4vN7mP9sT1uE6wA3bG5dI2jK8lM4n'); // Public demo key
-    xhr.setRequestHeader('X-Bin-Name', roomName);
+    xhr.setRequestHeader('X-Bin-Name', this.gameRoom);
     xhr.setRequestHeader('X-Bin-Private', 'false');
     
     xhr.onreadystatechange = function() {
@@ -69,96 +66,18 @@ GameState.prototype.createRoom = function() {
                 try {
                     var response = JSON.parse(xhr.responseText);
                     self.binId = response.metadata.id;
-                    self.gameRoom = roomName;
-                    
-                    // Save room info locally
-                    localStorage.setItem('current-room-data', JSON.stringify({
-                        binId: self.binId,
-                        roomName: roomName
-                    }));
-                    
-                    document.getElementById('room-display').textContent = 'Room: ' + roomName;
-                    document.getElementById('share-code').textContent = roomName;
-                    self.showMessage('Room created: ' + roomName, 'success');
+                    self.showMessage('Game room created and ready!', 'success');
                     self.startPolling();
                 } catch (e) {
-                    self.showMessage('Failed to create room', 'error');
+                    self.showMessage('Failed to create game room', 'error');
                 }
             } else {
-                self.showMessage('Failed to create room', 'error');
+                self.showMessage('Failed to create game room', 'error');
             }
         }
     };
     
     xhr.send(JSON.stringify(initData));
-};
-
-// Join existing room
-GameState.prototype.joinRoom = function() {
-    var roomCode = document.getElementById('room-code-input').value.trim().toUpperCase();
-    
-    if (!roomCode) {
-        this.showMessage('Please enter a room code', 'error');
-        return;
-    }
-    
-    var self = this;
-    
-    // Search for room by name
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', 'https://api.jsonbin.io/v3/c/collection/bins', true);
-    xhr.setRequestHeader('X-Master-Key', '$2a$10$qZ9wJQz5qH8rC3xK2yF6yO8xL4vN7mP9sT1uE6wA3bG5dI2jK8lM4n');
-    
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-            if (xhr.status === 200) {
-                try {
-                    var response = JSON.parse(xhr.responseText);
-                    var foundBin = null;
-                    
-                    // Look for matching room name
-                    for (var i = 0; i < response.length; i++) {
-                        if (response[i].name === roomCode) {
-                            foundBin = response[i];
-                            break;
-                        }
-                    }
-                    
-                    if (foundBin) {
-                        self.binId = foundBin.id;
-                        self.gameRoom = roomCode;
-                        
-                        localStorage.setItem('current-room-data', JSON.stringify({
-                            binId: self.binId,
-                            roomName: roomCode
-                        }));
-                        
-                        document.getElementById('room-display').textContent = 'Room: ' + roomCode;
-                        self.showMessage('Joined room: ' + roomCode, 'success');
-                        self.startPolling();
-                    } else {
-                        self.showMessage('Room not found', 'error');
-                    }
-                } catch (e) {
-                    self.showMessage('Error finding room', 'error');
-                }
-            } else {
-                self.showMessage('Error finding room', 'error');
-            }
-        }
-    };
-    
-    xhr.send();
-};
-
-// Generate simple room code
-GameState.prototype.generateRoomCode = function() {
-    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars
-    var result = '';
-    for (var i = 0; i < 4; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
 };
 
 // Load shared game data
@@ -264,13 +183,8 @@ GameState.prototype.syncWithOthers = function() {
     });
 };
 
-// Join the game
+// Join the game - simplified since there's only one room
 GameState.prototype.joinGame = function() {
-    if (!this.binId) {
-        this.showMessage('Please create or join a room first', 'error');
-        return;
-    }
-    
     var nameInput = document.getElementById('player-name-welcome');
     var name = nameInput.value.trim();
     
@@ -580,14 +494,12 @@ GameState.prototype.updateOtherPlayersDisplay = function(allPlayers) {
 GameState.prototype.updateWelcomeDisplay = function() {
     var self = this;
     
-    if (!this.binId) {
-        var onlineEl = document.getElementById('players-online');
-        if (onlineEl) onlineEl.textContent = 'No room joined';
-        return;
-    }
-    
     this.loadSharedData(function(data) {
-        if (!data || !data.players) return;
+        if (!data || !data.players) {
+            var onlineEl = document.getElementById('players-online');
+            if (onlineEl) onlineEl.textContent = 'Connecting to game...';
+            return;
+        }
         
         var activeCount = 0;
         var now = Date.now();
@@ -599,7 +511,7 @@ GameState.prototype.updateWelcomeDisplay = function() {
         }
         
         var onlineEl = document.getElementById('players-online');
-        if (onlineEl) onlineEl.textContent = activeCount + ' player(s) in room';
+        if (onlineEl) onlineEl.textContent = activeCount + ' player(s) online';
     });
 };
 
@@ -852,19 +764,9 @@ GameState.prototype.showMessage = function(text, type) {
     }, 3000);
 };
 
-// Event listeners
+// Event listeners - simplified without room creation buttons
 GameState.prototype.setupEventListeners = function() {
     var self = this;
-    
-    var createBtn = document.getElementById('create-room-btn');
-    if (createBtn) {
-        createBtn.onclick = function() { self.createRoom(); };
-    }
-    
-    var joinBtn = document.getElementById('join-room-btn');
-    if (joinBtn) {
-        joinBtn.onclick = function() { self.joinRoom(); };
-    }
     
     var startBtn = document.getElementById('join-game-btn');
     if (startBtn) {
@@ -895,17 +797,6 @@ GameState.prototype.setupEventListeners = function() {
     if (modal) {
         modal.onclick = function(e) {
             if (e.target.id === 'action-modal') self.closeActionModal();
-        };
-    }
-    
-    // Auto-uppercase room code input
-    var roomInput = document.getElementById('room-code-input');
-    if (roomInput) {
-        roomInput.oninput = function() {
-            this.value = this.value.toUpperCase();
-        };
-        roomInput.onkeypress = function(e) {
-            if (e.key === 'Enter') self.joinRoom();
         };
     }
     
