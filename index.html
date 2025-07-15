@@ -15,27 +15,38 @@
                 <p>Watch the game, play your cards!</p>
             </div>
             
+            <!-- Room Management -->
+            <div class="setup-info">
+                <p id="room-display">No room joined</p>
+                <p id="share-code" style="font-weight: bold; color: #4CAF50; font-size: 1.5em;"></p>
+            </div>
+            
+            <div class="button-group">
+                <button id="create-room-btn" class="btn btn-primary">Create New Room</button>
+            </div>
+            
+            <div class="form-group">
+                <label for="room-code-input">Join Existing Room:</label>
+                <input type="text" id="room-code-input" placeholder="Enter 4-letter room code" maxlength="4" style="text-transform: uppercase;">
+            </div>
+            
+            <div class="button-group">
+                <button id="join-room-btn" class="btn btn-secondary">Join Room</button>
+            </div>
+            
+            <hr style="margin: 30px 0; border: 1px solid rgba(255,255,255,0.2);">
+            
             <div class="form-group">
                 <label for="player-name-welcome">Your Name:</label>
                 <input type="text" id="player-name-welcome" placeholder="Enter your name" maxlength="20">
             </div>
             
             <div class="button-group">
-                <button id="join-game-btn" class="btn btn-primary">Join Game</button>
-                <button id="view-cards-btn" class="btn btn-secondary">View All Cards</button>
+                <button id="join-game-btn" class="btn btn-primary">Start Playing</button>
             </div>
             
             <div id="game-status" class="setup-info" style="margin-top: 20px;">
                 <p id="players-online">Loading...</p>
-            </div>
-        </div>
-
-        <!-- Card Viewer Screen -->
-        <div id="card-viewer-screen" class="screen">
-            <h2>All Cards</h2>
-            <div id="cards-list"></div>
-            <div class="button-group">
-                <button id="back-to-welcome-cards" class="btn btn-secondary">Back</button>
             </div>
         </div>
 
@@ -90,8 +101,6 @@
             
             <div class="button-group">
                 <button id="new-game-btn" class="btn btn-primary">Leave Game</button>
-                <button id="reset-for-everyone-btn" class="btn btn-danger">🔄 Reset Game for Everyone</button>
-                <button id="back-to-menu-btn" class="btn btn-secondary">Back to Menu</button>
             </div>
         </div>
 
@@ -113,24 +122,6 @@
             </div>
         </div>
 
-        <!-- Reset Game Confirmation Modal -->
-        <div id="reset-modal" class="modal">
-            <div class="modal-content">
-                <h3 style="color: #f44336;">⚠️ Reset Game for Everyone</h3>
-                <p><strong>This will completely reset the game for ALL players!</strong></p>
-                <p>Everyone will be returned to the welcome screen and all progress will be lost.</p>
-                
-                <div style="background: rgba(244,67,54,0.2); padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid rgba(244,67,54,0.3);">
-                    <p style="margin: 0; font-weight: 600;">This action cannot be undone!</p>
-                </div>
-
-                <div class="button-group">
-                    <button id="reset-confirm" class="btn btn-danger">Yes, Reset for Everyone</button>
-                    <button id="reset-cancel" class="btn btn-secondary">Cancel</button>
-                </div>
-            </div>
-        </div>
-
         <!-- Error/Success Messages -->
         <div id="message-container" class="message-container"></div>
     </div>
@@ -141,7 +132,7 @@
     
     <!-- Initialize Game -->
     <script>
-        console.log('Starting game initialization...');
+        console.log('Starting simplified game initialization...');
         
         window.addEventListener('load', function() {
             console.log('Page fully loaded');
@@ -150,7 +141,7 @@
                 try {
                     if (typeof GameState !== 'undefined') {
                         window.game = new GameState();
-                        console.log('✅ Game initialized successfully!');
+                        console.log('✅ Simplified game initialized successfully!');
                     } else {
                         console.error('❌ GameState function not found');
                     }
