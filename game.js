@@ -9,7 +9,7 @@ function GameState() {
     this.holdCards = [];
     this.activeEffects = {};
     
-    // Use a simple shared file
+    // Use a simple shared file - NO JSONBin.io
     this.dataFile = 'shared-data.json';
     this.useFallback = false;
     
@@ -38,7 +38,7 @@ GameState.prototype.initializeSharedRoom = function() {
     });
 };
 
-// Load shared game data
+// Load shared game data - NO JSONBin.io here
 GameState.prototype.loadSharedData = function(callback) {
     if (this.useFallback) {
         // Use localStorage as fallback
@@ -51,6 +51,7 @@ GameState.prototype.loadSharedData = function(callback) {
         return;
     }
     
+    // Try to load the shared-data.json file
     var xhr = new XMLHttpRequest();
     xhr.open('GET', this.dataFile + '?t=' + Date.now(), true); // Cache busting
     
@@ -79,7 +80,7 @@ GameState.prototype.loadSharedData = function(callback) {
     xhr.send();
 };
 
-// Save shared game data
+// Save shared game data - NO JSONBin.io here either
 GameState.prototype.saveSharedData = function(data, callback) {
     if (this.useFallback) {
         // Use localStorage as fallback
@@ -758,7 +759,7 @@ GameState.prototype.showMessage = function(text, type) {
     }, 3000);
 };
 
-// Event listeners - simplified without room creation buttons
+// Event listeners - NO room creation buttons
 GameState.prototype.setupEventListeners = function() {
     var self = this;
     
