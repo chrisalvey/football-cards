@@ -1,4 +1,4 @@
-// Version: 1.0.9 - Simple Local Game (Works Immediately)
+// Version: 1.0.9 - Simple Local Game (Works Immediately)b
 function GameState() {
     this.currentPlayer = null;
     this.gameStarted = false;
