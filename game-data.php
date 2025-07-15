@@ -1,4 +1,5 @@
 <?php
+// Version: 1.0.1 - PHP Game Data Handler
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT');
