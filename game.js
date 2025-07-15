@@ -124,7 +124,7 @@ GameState.prototype.syncWithOthers = function() {
     });
 };
 
-// Join the game - simplified since there's only one room
+// Join the game - no room checks needed since there's only one shared room
 GameState.prototype.joinGame = function() {
     var nameInput = document.getElementById('player-name-welcome');
     var name = nameInput.value.trim();
