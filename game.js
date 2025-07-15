@@ -26,67 +26,13 @@ GameState.prototype.init = function() {
 GameState.prototype.initializeSharedRoom = function() {
     var self = this;
     
-    // Try to load existing shared room data
-    this.loadSharedData(function(data) {
-        if (data) {
-            // Room exists, just connect
-            self.showMessage('Connected to game room', 'success');
-            self.startPolling();
-        } else {
-            // Room doesn't exist, create it
-            self.createSharedRoom();
-        }
-    });
-};
-
-// Create the shared room if it doesn't exist
-GameState.prototype.createSharedRoom = function() {
-    var self = this;
-    
-    var initData = {
-        roomName: this.gameRoom,
-        players: {},
-        hands: {},
-        messages: [],
-        gameActive: true,
-        created: Date.now()
-    };
-    
-    // Create bin at JSONBin.io (free service)
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', 'https://api.jsonbin.io/v3/b', true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.setRequestHeader('X-Master-Key', '$2a$10$qZ9wJQz5qH8rC3xK2yF6yO8xL4vN7mP9sT1uE6wA3bG5dI2jK8lM4n'); // Public demo key
-    xhr.setRequestHeader('X-Bin-Name', this.gameRoom);
-    xhr.setRequestHeader('X-Bin-Private', 'false');
-    
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-            if (xhr.status === 200) {
-                try {
-                    var response = JSON.parse(xhr.responseText);
-                    self.binId = response.metadata.id;
-                    self.showMessage('Game room created and ready!', 'success');
-                    self.startPolling();
-                } catch (e) {
-                    self.showMessage('Failed to create game room', 'error');
-                }
-            } else {
-                self.showMessage('Failed to create game room', 'error');
-            }
-        }
-    };
-    
-    xhr.send(JSON.stringify(initData));
+    // Just connect to the shared room and start polling
+    self.showMessage('Connected to game room', 'success');
+    self.startPolling();
 };
 
 // Load shared game data
 GameState.prototype.loadSharedData = function(callback) {
-    if (!this.binId) {
-        callback(null);
-        return;
-    }
-    
     var xhr = new XMLHttpRequest();
     xhr.open('GET', 'https://api.jsonbin.io/v3/b/' + this.binId + '/latest', true);
     xhr.setRequestHeader('X-Master-Key', '$2a$10$qZ9wJQz5qH8rC3xK2yF6yO8xL4vN7mP9sT1uE6wA3bG5dI2jK8lM4n');
@@ -111,11 +57,6 @@ GameState.prototype.loadSharedData = function(callback) {
 
 // Save shared game data
 GameState.prototype.saveSharedData = function(data, callback) {
-    if (!this.binId) {
-        if (callback) callback(false);
-        return;
-    }
-    
     var xhr = new XMLHttpRequest();
     xhr.open('PUT', 'https://api.jsonbin.io/v3/b/' + this.binId, true);
     xhr.setRequestHeader('Content-Type', 'application/json');
