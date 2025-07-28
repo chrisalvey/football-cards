@@ -46,6 +46,13 @@ body {
     text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 }
 
+.logo h2 {
+    font-size: 1.8em;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    color: #4CAF50;
+}
+
 .logo p {
     font-size: 1.1em;
     opacity: 0.9;
@@ -99,6 +106,7 @@ body {
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-bottom: 12px;
+    text-align: center;
 }
 
 .btn:last-child {
@@ -148,6 +156,22 @@ body {
     gap: 12px;
 }
 
+/* Game Mode Buttons */
+.btn strong {
+    display: block;
+    margin-bottom: 5px;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.btn small {
+    opacity: 0.8;
+    font-size: 0.85em;
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: normal;
+}
+
 /* Game info sections */
 .setup-info {
     background: rgba(255,255,255,0.1);
@@ -164,9 +188,19 @@ body {
     color: #4CAF50;
 }
 
+.setup-info h3 {
+    color: #FFB74D;
+    border-bottom: 2px solid rgba(255,183,77,0.3);
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+}
+
 .setup-info p {
     opacity: 0.9;
     font-size: 0.95em;
+    margin: 8px 0;
+    padding-left: 10px;
+    border-left: 2px solid rgba(76,175,80,0.3);
 }
 
 .game-stats {
@@ -182,10 +216,22 @@ body {
     display: flex;
     justify-content: space-between;
     margin-bottom: 8px;
+    transition: all 0.3s ease;
 }
 
 .stats-row:last-child {
     margin-bottom: 0;
+}
+
+.stats-row:hover {
+    background: rgba(255,255,255,0.05);
+    border-radius: 6px;
+    padding: 5px;
+    margin: 0 -5px 8px -5px;
+}
+
+.stats-row:last-child:hover {
+    margin-bottom: -5px;
 }
 
 .stat-label {
@@ -195,6 +241,67 @@ body {
 .stat-value {
     font-weight: 600;
     color: #4CAF50;
+}
+
+/* Game Timer */
+.game-timer-container {
+    text-align: center;
+    margin: 10px 0;
+    font-size: 1.1em;
+}
+
+.game-timer {
+    font-family: 'Courier New', monospace;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #4CAF50;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+/* Progress Bar */
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 4px;
+    margin: 10px 0;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #45a049);
+    width: 0%;
+    transition: width 1s ease;
+    border-radius: 4px;
+}
+
+/* Final Score Display */
+.final-score-display {
+    text-align: center;
+    font-size: 3em;
+    font-weight: bold;
+    color: #4CAF50;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    margin: 20px 0;
+}
+
+/* New Best Indicator */
+.new-best {
+    background: linear-gradient(45deg, #FFD700, #FFA500);
+    color: #000;
+    padding: 15px;
+    border-radius: 12px;
+    font-weight: bold;
+    text-align: center;
+    margin: 20px 0;
+    animation: celebrate 2s ease-in-out infinite alternate;
+    box-shadow: 0 4px 15px rgba(255,215,0,0.4);
+}
+
+@keyframes celebrate {
+    from { transform: scale(1); }
+    to { transform: scale(1.05); }
 }
 
 /* Card sections */
@@ -211,7 +318,8 @@ body {
 
 .hand-cards {
     display: grid;
-    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
     margin-bottom: 20px;
 }
 
@@ -222,7 +330,7 @@ body {
     border-radius: 12px;
     padding: 15px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.3s ease, box-shadow 0.3s ease;
     position: relative;
 }
 
@@ -236,8 +344,18 @@ body {
 
 .card:hover {
     background: rgba(255,255,255,0.15);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+
+.card.event:hover {
+    border-left-color: #66BB6A;
+    box-shadow: 0 6px 20px rgba(76,175,80,0.4);
+}
+
+.card.action:hover {
+    border-left-color: #FFB74D;
+    box-shadow: 0 6px 20px rgba(255,152,0,0.4);
 }
 
 .card:active {
@@ -292,6 +410,8 @@ body {
     width: auto;
     display: inline-block;
     margin: 0;
+    position: relative;
+    overflow: hidden;
 }
 
 .btn-undo:hover {
@@ -301,6 +421,22 @@ body {
 .btn-undo:disabled {
     background: rgba(255,255,255,0.1);
     color: rgba(255,255,255,0.5);
+    cursor: not-allowed;
+}
+
+.btn-undo:not(:disabled)::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn-undo:not(:disabled):hover::before {
+    left: 100%;
 }
 
 /* Hold cards section */
@@ -320,6 +456,22 @@ body {
     border-radius: 8px;
     padding: 10px;
     font-size: 0.9em;
+    position: relative;
+    overflow: hidden;
+}
+
+.hold-card::before {
+    content: '✨';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 1.2em;
+    animation: sparkle 2s ease-in-out infinite;
+}
+
+@keyframes sparkle {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.2); }
 }
 
 .hold-card-name {
@@ -411,6 +563,16 @@ body {
     line-height: 1.4;
 }
 
+/* Peek Modal Styling */
+.peek-card {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    padding: 10px;
+    margin: 8px 0;
+    border-left: 3px solid #4CAF50;
+}
+
 .target-selection {
     margin: 20px 0;
 }
@@ -461,6 +623,7 @@ body {
 .message-success {
     background: rgba(76,175,80,0.9);
     border: 1px solid #4CAF50;
+    animation: successPulse 0.6s ease-out;
 }
 
 .message-error {
@@ -484,6 +647,12 @@ body {
     }
 }
 
+@keyframes successPulse {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
 /* Typography */
 h2 {
     text-align: center;
@@ -500,6 +669,13 @@ h2 {
 }
 
 /* Responsive design */
+@media (max-width: 600px) {
+    .hand-cards {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+}
+
 @media (max-width: 480px) {
     .container {
         padding: 10px;
@@ -509,9 +685,25 @@ h2 {
         font-size: 2em;
     }
     
+    .final-score-display {
+        font-size: 2.5em;
+    }
+    
+    .game-timer {
+        font-size: 1.3em;
+    }
+    
     .form-group input, .btn {
         padding: 12px;
         font-size: 14px;
+    }
+    
+    .btn strong {
+        font-size: 0.95em;
+    }
+    
+    .btn small {
+        font-size: 0.8em;
     }
 }
 
@@ -522,6 +714,14 @@ h2 {
     }
     
     .btn:active {
+        transform: scale(0.98);
+    }
+    
+    .card:hover {
+        transform: none;
+    }
+    
+    .card:active {
         transform: scale(0.98);
     }
 }

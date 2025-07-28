@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Football Card Game</title>
+    <title>Football Cards - Solo Challenge</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,12 +12,12 @@
         <div id="welcome-screen" class="screen active">
             <div class="logo">
                 <h1>🏈 Football Cards</h1>
-                <p>Watch the game, play your cards!</p>
+                <p>Solo Challenge Mode</p>
             </div>
             
             <div class="setup-info">
-                <h2>Join the Game</h2>
-                <p>Everyone plays in the same room - just enter your name and start!</p>
+                <h2>Compete Against Yourself!</h2>
+                <p>Play cards when events happen during real football games. Try to beat your personal best!</p>
             </div>
             
             <div class="form-group">
@@ -27,10 +27,51 @@
             
             <div class="button-group">
                 <button id="join-game-btn" class="btn btn-primary">Start Playing</button>
+                <button id="view-stats-btn" class="btn btn-secondary">View Stats</button>
             </div>
             
-            <div id="game-status" class="setup-info" style="margin-top: 20px;">
-                <p id="players-online">Connecting...</p>
+            <div id="current-stats" class="setup-info" style="margin-top: 20px;">
+                <div class="stats-row">
+                    <span class="stat-label">Personal Best:</span>
+                    <span class="stat-value" id="personal-best">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stat-label">Games Played:</span>
+                    <span class="stat-value" id="games-played">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stat-label">Average Score:</span>
+                    <span class="stat-value" id="average-score">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Mode Selection Screen -->
+        <div id="game-mode-screen" class="screen">
+            <div class="logo">
+                <h2>Choose Game Length</h2>
+                <p>Match your game to the football you're watching!</p>
+            </div>
+            
+            <div class="button-group">
+                <button id="quarter-game-btn" class="btn btn-primary">
+                    <strong>Quarter Game</strong><br>
+                    <small>15 minutes • Quick game</small>
+                </button>
+                
+                <button id="half-game-btn" class="btn btn-primary">
+                    <strong>Half Game</strong><br>
+                    <small>30 minutes • Standard game</small>
+                </button>
+                
+                <button id="full-game-btn" class="btn btn-primary">
+                    <strong>Full Game</strong><br>
+                    <small>60 minutes • Championship mode</small>
+                </button>
+            </div>
+            
+            <div class="button-group" style="margin-top: 30px;">
+                <button class="btn btn-secondary" onclick="game.showScreen('welcome-screen')">Back</button>
             </div>
         </div>
 
@@ -38,6 +79,12 @@
         <div id="game-screen" class="screen">
             <div class="setup-info">
                 <h2 id="game-player-name">Player</h2>
+                <div class="game-timer-container">
+                    <span>Time: </span><span id="game-timer" class="game-timer">15:00</span>
+                </div>
+                <div class="progress-bar">
+                    <div id="game-progress" class="progress-fill"></div>
+                </div>
             </div>
 
             <!-- Game Stats -->
@@ -52,23 +99,17 @@
                 </div>
                 <div class="stats-row">
                     <span class="stat-label">Cards in Hand:</span>
-                    <span class="stat-value" id="cards-in-hand">5</span>
+                    <span class="stat-value" id="cards-in-hand">7</span>
                 </div>
                 <div class="stats-row">
-                    <span class="stat-label">Players Online:</span>
-                    <span class="stat-value" id="players-online-game">1</span>
+                    <span class="stat-label">Cards Remaining:</span>
+                    <span class="stat-value" id="cards-remaining">74</span>
                 </div>
-            </div>
-
-            <!-- Other Players Section -->
-            <div id="other-players-section" class="hand-section" style="display: none;">
-                <h3>Other Players</h3>
-                <div id="other-players-list"></div>
             </div>
 
             <!-- Undo Section -->
             <div class="undo-section">
-                <button id="undo-btn" class="btn btn-undo" disabled>↶ Undo Last Play</button>
+                <button id="undo-btn" class="btn btn-undo">↶ Undo Last Play</button>
             </div>
 
             <!-- Player Hand -->
@@ -79,30 +120,85 @@
 
             <!-- Hold Cards Section -->
             <div class="hold-cards-section" id="hold-cards-section" style="display: none;">
-                <h3>Hold Cards (Active Effects)</h3>
+                <h3>Active Hold Cards</h3>
                 <div id="hold-cards" class="hold-cards"></div>
             </div>
             
             <div class="button-group">
-                <button id="new-game-btn" class="btn btn-primary">Leave Game</button>
+                <button id="new-game-btn" class="btn btn-danger">End Game</button>
             </div>
         </div>
 
-        <!-- Action Card Modal -->
-        <div id="action-modal" class="modal">
-            <div class="modal-content">
-                <h3 id="action-title">Action Card</h3>
-                <p id="action-description">Description</p>
-                
-                <div id="target-selection" class="target-selection" style="display: none;">
-                    <p><strong>Choose target:</strong></p>
-                    <div id="target-buttons"></div>
+        <!-- End Game Screen -->
+        <div id="end-game-screen" class="screen">
+            <div class="logo">
+                <h1>🏁 Game Complete!</h1>
+            </div>
+            
+            <div class="setup-info">
+                <h2>Final Score</h2>
+                <div class="final-score-display">
+                    <span id="final-score">0</span> points
                 </div>
+                <div id="new-best-indicator" class="new-best" style="display: none;">
+                    🏆 NEW PERSONAL BEST! 🏆
+                </div>
+            </div>
+            
+            <div class="game-stats">
+                <div class="stats-row">
+                    <span class="stat-label">Game Duration:</span>
+                    <span class="stat-value" id="game-duration">15 minutes</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stat-label">Personal Best:</span>
+                    <span class="stat-value" id="final-personal-best">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stat-label">Average Score:</span>
+                    <span class="stat-value" id="final-average-score">0</span>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="game.showScreen('game-mode-screen')">Play Again</button>
+                <button class="btn btn-secondary" onclick="game.showScreen('welcome-screen')">Main Menu</button>
+            </div>
+        </div>
 
-                <div class="button-group">
-                    <button id="action-confirm" class="btn btn-primary">Confirm</button>
-                    <button id="action-cancel" class="btn btn-secondary">Cancel</button>
+        <!-- Stats Screen -->
+        <div id="stats-screen" class="screen">
+            <div class="logo">
+                <h2>📊 Your Statistics</h2>
+            </div>
+            
+            <div class="setup-info">
+                <h3>Personal Records</h3>
+                <div class="stats-row">
+                    <span class="stat-label">Personal Best Score:</span>
+                    <span class="stat-value" id="stats-personal-best">0</span>
                 </div>
+                <div class="stats-row">
+                    <span class="stat-label">Games Played:</span>
+                    <span class="stat-value" id="stats-games-played">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stat-label">Average Score:</span>
+                    <span class="stat-value" id="stats-average-score">0</span>
+                </div>
+            </div>
+            
+            <div class="setup-info">
+                <h3>Performance Tips</h3>
+                <p>• Save Double Next Score cards for high-value events like Touchdowns</p>
+                <p>• Use action cards early to get more cards in your hand</p>
+                <p>• Watch for scoring streaks - 3 events in a row gives bonus points!</p>
+                <p>• Quarter bonuses give extra points as time progresses</p>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="game.showScreen('game-mode-screen')">Start New Game</button>
+                <button class="btn btn-secondary" onclick="game.showScreen('welcome-screen')">Back to Menu</button>
             </div>
         </div>
 
@@ -116,7 +212,7 @@
     
     <!-- Initialize Game -->
     <script>
-        console.log('Starting single-room game initialization...');
+        console.log('Starting Football Cards Solo Challenge...');
         
         window.addEventListener('load', function() {
             console.log('Page fully loaded');
@@ -125,7 +221,7 @@
                 try {
                     if (typeof GameState !== 'undefined') {
                         window.game = new GameState();
-                        console.log('✅ Single-room game initialized successfully!');
+                        console.log('✅ Solo game initialized successfully!');
                     } else {
                         console.error('❌ GameState function not found');
                     }
