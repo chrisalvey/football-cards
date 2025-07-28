@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -175,6 +174,22 @@ body {
     opacity: 0.8;
 }
 
+.chain-section {
+    background: rgba(138,43,226,0.1);
+    border: 2px solid #8A2BE2;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.chain-counter {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #8A2BE2;
+    margin-bottom: 5px;
+}
+
 .hand-section {
     margin: 20px 0;
 }
@@ -212,6 +227,11 @@ body {
     border-left: 4px solid #ff9800;
 }
 
+.card.defensive {
+    border-left: 4px solid #f44336;
+    background: rgba(244,67,54,0.1);
+}
+
 .card:hover {
     background: rgba(255,255,255,0.15);
     transform: translateY(-3px);
@@ -243,6 +263,13 @@ body {
     font-size: 0.85em;
     opacity: 0.9;
     line-height: 1.3;
+}
+
+.card-rarity {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 16px;
 }
 
 .message-container {
@@ -277,6 +304,11 @@ body {
 .message-info {
     background: rgba(33,150,243,0.9);
     border: 1px solid #2196F3;
+}
+
+.message-special {
+    background: rgba(156,39,176,0.9);
+    border: 1px solid #9c27b0;
 }
 
 @keyframes slideDown {
@@ -326,12 +358,20 @@ body {
                     <span class="stat-label">Average Score:</span>
                     <span class="stat-value" id="avg-score">0</span>
                 </div>
+                
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2); font-size: 0.9em; opacity: 0.8;">
+                    <div style="text-align: center; margin-bottom: 8px; font-weight: 600;">Card Rarity Guide</div>
+                    <div style="display: flex; justify-content: space-around; text-align: center;">
+                        <div><span style="font-size: 1.2em;">💎</span><br>Uncommon</div>
+                        <div><span style="font-size: 1.2em;">⭐</span><br>Rare</div>
+                        <div><span style="font-size: 1.2em;">🏆</span><br>Legendary</div>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Game Screen -->
         <div id="game-screen" class="screen">
-            <!-- Player Info -->
             <div class="setup-info">
                 <h2>Football Cards Game</h2>
                 <p>Watch the game and play matching cards when events happen!</p>
@@ -341,6 +381,12 @@ body {
             <div class="combo-section" id="combo-section" style="display: none;">
                 <div class="combo-multiplier" id="combo-multiplier">2x COMBO!</div>
                 <div class="combo-description" id="combo-description">Next event card worth double points!</div>
+            </div>
+
+            <!-- Chain System -->
+            <div class="chain-section" id="chain-section" style="display: none;">
+                <div class="chain-counter" id="chain-counter">🔗 CHAIN x2</div>
+                <div class="combo-description" id="chain-description">Defensive momentum building!</div>
             </div>
 
             <!-- Game Stats -->
@@ -355,7 +401,7 @@ body {
                 </div>
                 <div class="stats-row">
                     <span class="stat-label">Cards Left:</span>
-                    <span class="stat-value" id="cards-remaining">52</span>
+                    <span class="stat-value" id="cards-remaining">60</span>
                 </div>
                 <div class="stats-row">
                     <span class="stat-label">Next Milestone:</span>
@@ -384,7 +430,9 @@ body {
             constructor() {
                 this.score = 0;
                 this.comboMultiplier = 1;
+                this.chainMultiplier = 1;
                 this.cardsPlayed = 0;
+                this.defensiveChain = 0;
                 this.cards = this.generateCards();
                 this.hand = [];
                 this.playHistory = [];
@@ -404,27 +452,42 @@ body {
             
             generateCards() {
                 const cardTypes = [
-                    { name: 'Touchdown', points: 7, type: 'event', count: 8 },
-                    { name: 'Field Goal', points: 3, type: 'event', count: 6 },
-                    { name: 'Interception', points: 5, type: 'event', count: 4 },
-                    { name: 'Sack', points: 3, type: 'event', count: 6 },
-                    { name: 'Safety', points: 2, type: 'event', count: 2 },
-                    { name: 'Penalty', points: 2, type: 'event', count: 8 },
-                    { name: 'First Down', points: 1, type: 'event', count: 12 },
-                    { name: 'Punt', points: 1, type: 'event', count: 6 },
-                    { name: 'Double Next', points: 0, type: 'action', count: 3 },
-                    { name: 'Draw Cards', points: 0, type: 'action', count: 3 },
-                    { name: 'Combo Boost', points: 0, type: 'action', count: 3 }
+                    // Original Event Cards
+                    { name: 'Touchdown', points: 7, type: 'event', count: 6, rarity: 'common' },
+                    { name: 'Field Goal', points: 3, type: 'event', count: 6, rarity: 'common' },
+                    { name: 'Interception', points: 5, type: 'event', count: 4, rarity: 'uncommon', category: 'defensive' },
+                    { name: 'Sack', points: 3, type: 'event', count: 5, rarity: 'common', category: 'defensive' },
+                    { name: 'Safety', points: 2, type: 'event', count: 2, rarity: 'rare' },
+                    { name: 'Penalty', points: 2, type: 'event', count: 6, rarity: 'common' },
+                    { name: 'First Down', points: 1, type: 'event', count: 10, rarity: 'common' },
+                    { name: 'Punt', points: 1, type: 'event', count: 5, rarity: 'common' },
+                    
+                    // Original Action Cards
+                    { name: 'Double Next', points: 0, type: 'action', count: 3, rarity: 'uncommon' },
+                    { name: 'Draw Cards', points: 0, type: 'action', count: 3, rarity: 'uncommon' },
+                    { name: 'Combo Boost', points: 0, type: 'action', count: 2, rarity: 'uncommon' },
+                    
+                    // Enhanced Event Cards (Clear benefit)
+                    { name: 'Fumble Recovery', points: 4, type: 'event', count: 3, rarity: 'uncommon', category: 'defensive' },
+                    { name: 'Pick Six', points: 12, type: 'event', count: 1, rarity: 'legendary', category: 'defensive' },
+                    { name: 'Hail Mary', points: 10, type: 'event', count: 1, rarity: 'legendary' },
+                    { name: 'Blocked Kick', points: 4, type: 'event', count: 2, rarity: 'rare', category: 'defensive' },
+                    { name: 'Two-Point Conversion', points: 2, type: 'event', count: 2, rarity: 'rare' },
+                    
+                    // Defensive Specialist Cards (Clear benefit)
+                    { name: 'Red Zone Stop', points: 6, type: 'defensive', count: 2, rarity: 'uncommon' }
                 ];
                 
                 let deck = [];
                 cardTypes.forEach(cardType => {
                     for (let i = 0; i < cardType.count; i++) {
                         deck.push({
-                            id: `${cardType.name.toLowerCase().replace(' ', '_')}_${i}`,
+                            id: `${cardType.name.toLowerCase().replace(/[^a-z]/g, '_')}_${i}`,
                             name: cardType.name,
                             points: cardType.points,
                             type: cardType.type,
+                            rarity: cardType.rarity,
+                            category: cardType.category || 'general',
                             description: this.getCardDescription(cardType.name)
                         });
                     }
@@ -445,18 +508,23 @@ body {
                     'Punt': 'Team kicks ball away on 4th down',
                     'Double Next': 'Next event card worth 2x points',
                     'Draw Cards': 'Draw 2 additional cards',
-                    'Combo Boost': 'Add immediate bonus points'
+                    'Combo Boost': 'Instant +3 points (more with chain bonus)',
+                    'Fumble Recovery': 'Defense recovers loose ball',
+                    'Pick Six': 'Interception returned for TD',
+                    'Hail Mary': 'Long desperate touchdown pass',
+                    'Blocked Kick': 'Defense blocks field goal or punt',
+                    'Two-Point Conversion': 'Team goes for 2 after TD',
+                    'Red Zone Stop': 'Defense prevents TD in red zone'
                 };
                 return descriptions[cardName] || 'Special card effect';
             }
             
             shuffleDeck(deck) {
-                const shuffled = [...deck];
-                for (let i = shuffled.length - 1; i > 0; i--) {
+                for (let i = deck.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
-                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                    [deck[i], deck[j]] = [deck[j], deck[i]];
                 }
-                return shuffled;
+                return deck;
             }
             
             dealHand() {
@@ -487,11 +555,7 @@ body {
                 this.hand.splice(cardIndex, 1);
                 this.cardsPlayed++;
                 
-                if (card.type === 'event') {
-                    this.handleEventCard(card);
-                } else {
-                    this.handleActionCard(card);
-                }
+                this.processCard(card);
                 
                 if (this.cards.length > 0) {
                     this.hand.push(this.cards.pop());
@@ -499,21 +563,50 @@ body {
                 
                 this.displayHand();
                 this.updateDisplay();
-                this.updateComboDisplay();
                 this.checkMilestoneBonus();
             }
             
+            processCard(card) {
+                // Handle defensive chaining
+                if (card.category === 'defensive' || card.type === 'defensive') {
+                    this.defensiveChain++;
+                    this.chainMultiplier = Math.min(1 + (this.defensiveChain * 0.5), 3);
+                } else {
+                    this.defensiveChain = 0;
+                    this.chainMultiplier = 1;
+                }
+                
+                // Process card by type
+                switch (card.type) {
+                    case 'event':
+                        this.handleEventCard(card);
+                        break;
+                    case 'action':
+                        this.handleActionCard(card);
+                        break;
+                    case 'defensive':
+                        this.handleDefensiveCard(card);
+                        break;
+                }
+                
+                this.updateComboDisplay();
+            }
+            
             handleEventCard(card) {
-                let multiplier = this.comboMultiplier;
+                let multiplier = this.comboMultiplier * this.chainMultiplier;
                 let points = Math.round(card.points * multiplier);
                 this.score += points;
                 
                 let message = `${card.name} for ${points} points!`;
                 if (multiplier > 1) {
-                    message += ` (${multiplier}x multiplier!)`;
+                    message += ` (${multiplier.toFixed(1)}x multiplier!)`;
                 }
                 
-                this.showMessage(message, 'success');
+                if (card.rarity === 'legendary') {
+                    message = `🌟 LEGENDARY! ${message}`;
+                }
+                
+                this.showMessage(message, card.rarity === 'legendary' ? 'special' : 'success');
                 this.comboMultiplier = 1;
             }
             
@@ -528,11 +621,17 @@ body {
                         this.showMessage('Drew 2 extra cards!', 'success');
                         break;
                     case 'Combo Boost':
-                        const immediateBonus = 3;
+                        const immediateBonus = Math.round(3 * this.chainMultiplier);
                         this.score += immediateBonus;
                         this.showMessage(`Combo Boost! +${immediateBonus} immediate points!`, 'success');
                         break;
                 }
+            }
+            
+            handleDefensiveCard(card) {
+                let points = Math.round(card.points * this.chainMultiplier);
+                this.score += points;
+                this.showMessage(`🛡️ ${card.name}! +${points} points!`, 'success');
             }
             
             drawExtraCards(count) {
@@ -548,11 +647,17 @@ body {
                     this.showMessage(`🎯 ${this.cardsPlayed} Cards Milestone! +${bonus} bonus points!`, 'success');
                 }
                 
-                const lastPlayedCard = this.playHistory[this.playHistory.length - 1];
-                if (lastPlayedCard && lastPlayedCard.card.points >= 7) {
-                    const highValueBonus = 2;
+                const lastCard = this.playHistory[this.playHistory.length - 1]?.card;
+                if (lastCard && (lastCard.points >= 7 || lastCard.rarity === 'legendary')) {
+                    const highValueBonus = lastCard.rarity === 'legendary' ? 4 : 2;
                     this.score += highValueBonus;
-                    this.showMessage(`⭐ High-Value Card Bonus! +${highValueBonus} points!`, 'success');
+                    this.showMessage(`⭐ ${lastCard.rarity === 'legendary' ? 'Legendary' : 'High-Value'} Card Bonus! +${highValueBonus} points!`, 'success');
+                }
+                
+                if (this.defensiveChain >= 3 && this.defensiveChain % 3 === 0) {
+                    const chainBonus = this.defensiveChain * 2;
+                    this.score += chainBonus;
+                    this.showMessage(`🔗 Defensive Chain ${this.defensiveChain}! +${chainBonus} chain bonus!`, 'special');
                 }
             }
             
@@ -565,6 +670,8 @@ body {
                 const lastPlay = this.playHistory.pop();
                 this.score = lastPlay.scoreBefore;
                 this.cardsPlayed = lastPlay.cardsPlayedBefore;
+                this.defensiveChain = lastPlay.defensiveChainBefore;
+                this.chainMultiplier = lastPlay.chainMultiplierBefore;
                 
                 this.hand.splice(lastPlay.cardIndex, 0, lastPlay.card);
                 
@@ -574,6 +681,7 @@ body {
                 
                 this.displayHand();
                 this.updateDisplay();
+                this.updateComboDisplay();
                 this.showMessage('Move undone', 'info');
             }
             
@@ -583,7 +691,8 @@ body {
                     cardIndex: cardIndex,
                     scoreBefore: this.score,
                     cardsPlayedBefore: this.cardsPlayed,
-                    timestamp: Date.now()
+                    defensiveChainBefore: this.defensiveChain,
+                    chainMultiplierBefore: this.chainMultiplier
                 });
                 
                 if (this.playHistory.length > 5) {
@@ -600,16 +709,29 @@ body {
                     cardDiv.className = `card ${card.type}`;
                     cardDiv.onclick = () => this.playCard(index);
                     
+                    const pointsDisplay = card.points === 0 ? 'Special' : `${card.points} pts`;
+                    const rarityIcon = this.getRarityIcon(card.rarity);
+                    
                     cardDiv.innerHTML = `
                         <div class="card-header">
                             <span class="card-name">${card.name}</span>
-                            <span class="card-points">${card.points} pts</span>
+                            <span class="card-points">${pointsDisplay}</span>
                         </div>
                         <div class="card-description">${card.description}</div>
+                        ${rarityIcon ? `<div class="card-rarity">${rarityIcon}</div>` : ''}
                     `;
                     
                     container.appendChild(cardDiv);
                 });
+            }
+            
+            getRarityIcon(rarity) {
+                const icons = {
+                    'uncommon': '💎',
+                    'rare': '⭐',
+                    'legendary': '🏆'
+                };
+                return icons[rarity] || '';
             }
             
             updateDisplay() {
@@ -633,6 +755,18 @@ body {
                 } else {
                     comboSection.style.display = 'none';
                 }
+                
+                const chainSection = document.getElementById('chain-section');
+                const chainCounter = document.getElementById('chain-counter');
+                const chainDescription = document.getElementById('chain-description');
+                
+                if (this.defensiveChain > 0) {
+                    chainSection.style.display = 'block';
+                    chainCounter.textContent = `🔗 CHAIN x${this.chainMultiplier.toFixed(1)}`;
+                    chainDescription.textContent = `${this.defensiveChain} defensive plays in a row!`;
+                } else {
+                    chainSection.style.display = 'none';
+                }
             }
             
             endGame() {
@@ -643,13 +777,11 @@ body {
                 this.saveStats();
                 
                 let message = `Game Over! Final Score: ${finalScore}`;
-                
                 if (isNewBest) {
                     message += ' 🏆 NEW PERSONAL BEST!';
                 }
                 
                 this.showMessage(message, isNewBest ? 'success' : 'info');
-                
                 this.resetGame();
                 this.showScreen('welcome-screen');
             }
@@ -658,7 +790,6 @@ body {
                 if (this.score > this.personalBest) {
                     this.personalBest = this.score;
                 }
-                
                 this.gamesPlayed++;
                 this.averageScore = Math.round(((this.averageScore * (this.gamesPlayed - 1)) + this.score) / this.gamesPlayed);
             }
@@ -678,7 +809,9 @@ body {
             resetGame() {
                 this.score = 0;
                 this.comboMultiplier = 1;
+                this.chainMultiplier = 1;
                 this.cardsPlayed = 0;
+                this.defensiveChain = 0;
                 this.playHistory = [];
                 this.cards = this.generateCards();
                 this.dealHand();
@@ -697,7 +830,6 @@ body {
                 const message = document.createElement('div');
                 message.className = `message message-${type}`;
                 message.textContent = text;
-                
                 container.appendChild(message);
                 
                 setTimeout(() => {
