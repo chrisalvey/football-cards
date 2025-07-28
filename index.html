@@ -201,11 +201,38 @@ body {
     text-align: center;
 }
 
+.hand-notification {
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 15px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.hand-full {
+    background: rgba(255,152,0,0.2);
+    border: 2px solid #ff9800;
+    color: #ff9800;
+}
+
+.hand-low {
+    background: rgba(33,150,243,0.1);
+    border: 2px solid #2196F3;
+    color: #2196F3;
+}
+
 .hand-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 12px;
     margin-bottom: 20px;
+}
+
+.hand-cards.at-limit {
+    border: 2px solid #ff9800;
+    border-radius: 12px;
+    padding: 15px;
+    background: rgba(255,152,0,0.05);
 }
 
 .card {
@@ -412,6 +439,7 @@ body {
             <!-- Player Hand -->
             <div class="hand-section">
                 <h3>Your Cards</h3>
+                <div id="hand-status" class="hand-notification" style="display: none;"></div>
                 <div id="player-hand" class="hand-cards"></div>
             </div>
 
@@ -452,7 +480,6 @@ body {
             
             generateCards() {
                 const cardTypes = [
-                    // Original Event Cards
                     { name: 'Touchdown', points: 7, type: 'event', count: 6, rarity: 'common' },
                     { name: 'Field Goal', points: 3, type: 'event', count: 6, rarity: 'common' },
                     { name: 'Interception', points: 5, type: 'event', count: 4, rarity: 'uncommon', category: 'defensive' },
@@ -461,20 +488,14 @@ body {
                     { name: 'Penalty', points: 2, type: 'event', count: 6, rarity: 'common' },
                     { name: 'First Down', points: 1, type: 'event', count: 10, rarity: 'common' },
                     { name: 'Punt', points: 1, type: 'event', count: 5, rarity: 'common' },
-                    
-                    // Original Action Cards
                     { name: 'Double Next', points: 0, type: 'action', count: 3, rarity: 'uncommon' },
                     { name: 'Draw Cards', points: 0, type: 'action', count: 3, rarity: 'uncommon' },
                     { name: 'Combo Boost', points: 0, type: 'action', count: 2, rarity: 'uncommon' },
-                    
-                    // Enhanced Event Cards (Clear benefit)
                     { name: 'Fumble Recovery', points: 4, type: 'event', count: 3, rarity: 'uncommon', category: 'defensive' },
                     { name: 'Pick Six', points: 12, type: 'event', count: 1, rarity: 'legendary', category: 'defensive' },
                     { name: 'Hail Mary', points: 10, type: 'event', count: 1, rarity: 'legendary' },
                     { name: 'Blocked Kick', points: 4, type: 'event', count: 2, rarity: 'rare', category: 'defensive' },
                     { name: 'Two-Point Conversion', points: 2, type: 'event', count: 2, rarity: 'rare' },
-                    
-                    // Defensive Specialist Cards (Clear benefit)
                     { name: 'Red Zone Stop', points: 6, type: 'defensive', count: 2, rarity: 'uncommon' }
                 ];
                 
@@ -557,8 +578,8 @@ body {
                 
                 this.processCard(card);
                 
-                if (this.cards.length > 0) {
-                    this.hand.push(this.cards.pop());
+                if (this.hand.length <= 2 && this.cards.length > 0) {
+                    this.drawToHandSize(7);
                 }
                 
                 this.displayHand();
@@ -567,7 +588,6 @@ body {
             }
             
             processCard(card) {
-                // Handle defensive chaining
                 if (card.category === 'defensive' || card.type === 'defensive') {
                     this.defensiveChain++;
                     this.chainMultiplier = Math.min(1 + (this.defensiveChain * 0.5), 3);
@@ -576,7 +596,6 @@ body {
                     this.chainMultiplier = 1;
                 }
                 
-                // Process card by type
                 switch (card.type) {
                     case 'event':
                         this.handleEventCard(card);
@@ -635,8 +654,19 @@ body {
             }
             
             drawExtraCards(count) {
-                for (let i = 0; i < count && this.cards.length > 0; i++) {
+                for (let i = 0; i < count && this.cards.length > 0 && this.hand.length < 10; i++) {
                     this.hand.push(this.cards.pop());
+                }
+            }
+            
+            drawToHandSize(targetSize) {
+                const cardsToDraw = Math.min(targetSize - this.hand.length, this.cards.length);
+                for (let i = 0; i < cardsToDraw; i++) {
+                    this.hand.push(this.cards.pop());
+                }
+                
+                if (cardsToDraw > 0) {
+                    this.showMessage(`Drew ${cardsToDraw} cards!`, 'info');
                 }
             }
             
@@ -702,7 +732,26 @@ body {
             
             displayHand() {
                 const container = document.getElementById('player-hand');
+                const statusEl = document.getElementById('hand-status');
+                
                 container.innerHTML = '';
+                container.classList.remove('at-limit');
+                statusEl.style.display = 'none';
+                
+                // Show hand status notifications
+                if (this.hand.length >= 10 && this.cards.length > 0) {
+                    const drawCount = Math.min(7 - (this.hand.length - 1), this.cards.length);
+                    statusEl.textContent = `⚠️ Hand Full! Playing a card will draw ${drawCount} more`;
+                    statusEl.className = 'hand-notification hand-full';
+                    statusEl.style.display = 'block';
+                    container.classList.add('at-limit');
+                } else if (this.hand.length >= 3 && this.hand.length <= 4 && this.cards.length > 0) {
+                    const needed = 3 - this.hand.length;
+                    const cardText = needed === 1 ? '1 more card' : `${needed} more cards`;
+                    statusEl.textContent = `📋 Low Hand - Play ${cardText} to auto-draw back to 7`;
+                    statusEl.className = 'hand-notification hand-low';
+                    statusEl.style.display = 'block';
+                }
                 
                 this.hand.forEach((card, index) => {
                     const cardDiv = document.createElement('div');
@@ -771,12 +820,27 @@ body {
             
             endGame() {
                 const finalScore = this.score;
-                const isNewBest = finalScore > this.personalBest;
+                
+                let efficiencyBonus = 0;
+                if (this.hand.length === 0) {
+                    efficiencyBonus = 10;
+                } else if (this.hand.length === 1) {
+                    efficiencyBonus = 5;
+                } else if (this.hand.length === 2) {
+                    efficiencyBonus = 2;
+                }
+                
+                this.score += efficiencyBonus;
+                const totalScore = this.score;
+                const isNewBest = totalScore > this.personalBest;
                 
                 this.updateStats();
                 this.saveStats();
                 
-                let message = `Game Over! Final Score: ${finalScore}`;
+                let message = `Game Over! Final Score: ${totalScore}`;
+                if (efficiencyBonus > 0) {
+                    message += ` (includes +${efficiencyBonus} efficiency bonus!)`;
+                }
                 if (isNewBest) {
                     message += ' 🏆 NEW PERSONAL BEST!';
                 }
