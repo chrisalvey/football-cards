@@ -746,9 +746,12 @@ body {
                     statusEl.style.display = 'block';
                     container.classList.add('at-limit');
                 } else if (this.hand.length >= 3 && this.hand.length <= 4 && this.cards.length > 0) {
-                    const needed = 3 - this.hand.length;
-                    const cardText = needed === 1 ? '1 more card' : `${needed} more cards`;
-                    statusEl.textContent = `📋 Low Hand - Play ${cardText} to auto-draw back to 7`;
+                    const cardsToPlay = 3 - this.hand.length;
+                    if (cardsToPlay === 1) {
+                        statusEl.textContent = `📋 Low Hand - Play one more card and you will automatically draw back to 7`;
+                    } else {
+                        statusEl.textContent = `📋 Low Hand - Play ${cardsToPlay} more cards and you will automatically draw back to 7`;
+                    }
                     statusEl.className = 'hand-notification hand-low';
                     statusEl.style.display = 'block';
                 }
