@@ -309,6 +309,91 @@ body {
     max-width: 400px;
 }
 
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 350px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.modal-title {
+    font-size: 2em;
+    margin-bottom: 20px;
+    color: #4CAF50;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.score-breakdown {
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.score-line {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 1.1em;
+}
+
+.score-line:last-child {
+    margin-bottom: 0;
+}
+
+.score-line.total {
+    border-top: 2px solid rgba(255,255,255,0.3);
+    padding-top: 10px;
+    margin-top: 15px;
+    font-weight: bold;
+    font-size: 1.3em;
+    color: #4CAF50;
+}
+
+.score-label {
+    opacity: 0.9;
+}
+
+.score-value {
+    font-weight: 600;
+}
+
+.new-best {
+    background: rgba(76,175,80,0.2);
+    border: 2px solid #4CAF50;
+    border-radius: 8px;
+    padding: 10px;
+    margin: 15px 0;
+    font-weight: bold;
+    color: #4CAF50;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+
 .message {
     padding: 15px;
     border-radius: 10px;
@@ -451,6 +536,34 @@ body {
 
         <!-- Message Container -->
         <div id="message-container" class="message-container"></div>
+
+        <!-- End Game Modal -->
+        <div id="end-game-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-title">🏈 Game Complete!</div>
+                
+                <div class="score-breakdown">
+                    <div class="score-line">
+                        <span class="score-label">Base Score:</span>
+                        <span class="score-value" id="modal-base-score">0</span>
+                    </div>
+                    <div class="score-line">
+                        <span class="score-label">Cards in Hand:</span>
+                        <span class="score-value" id="modal-hand-penalty">0 cards × -1 = 0</span>
+                    </div>
+                    <div class="score-line total">
+                        <span class="score-label">Final Score:</span>
+                        <span class="score-value" id="modal-final-score">0</span>
+                    </div>
+                </div>
+
+                <div id="modal-new-best" class="new-best" style="display: none;">
+                    🏆 NEW PERSONAL BEST!
+                </div>
+
+                <button id="modal-continue-btn" class="btn btn-primary">Continue</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -464,6 +577,7 @@ body {
                 this.cards = this.generateCards();
                 this.hand = [];
                 this.playHistory = [];
+                this.discardPile = [];
                 
                 this.personalBest = parseInt(localStorage.getItem('football_best') || '0');
                 this.gamesPlayed = parseInt(localStorage.getItem('football_games') || '0');
@@ -484,18 +598,18 @@ body {
                     { name: 'Field Goal', points: 3, type: 'event', count: 6, rarity: 'common' },
                     { name: 'Interception', points: 5, type: 'event', count: 4, rarity: 'uncommon', category: 'defensive' },
                     { name: 'Sack', points: 3, type: 'event', count: 5, rarity: 'common', category: 'defensive' },
-                    { name: 'Safety', points: 2, type: 'event', count: 2, rarity: 'rare' },
-                    { name: 'Penalty', points: 2, type: 'event', count: 6, rarity: 'common' },
-                    { name: 'First Down', points: 1, type: 'event', count: 10, rarity: 'common' },
+                    { name: 'Safety', points: 4, type: 'event', count: 2, rarity: 'rare' },
+                    { name: 'Penalty', points: 2, type: 'event', count: 4, rarity: 'common' },
+                    { name: 'First Down', points: 1, type: 'event', count: 8, rarity: 'common' },
                     { name: 'Punt', points: 1, type: 'event', count: 5, rarity: 'common' },
                     { name: 'Double Next', points: 0, type: 'action', count: 3, rarity: 'uncommon' },
                     { name: 'Draw Cards', points: 0, type: 'action', count: 3, rarity: 'uncommon' },
                     { name: 'Combo Boost', points: 0, type: 'action', count: 2, rarity: 'uncommon' },
                     { name: 'Fumble Recovery', points: 4, type: 'event', count: 3, rarity: 'uncommon', category: 'defensive' },
                     { name: 'Pick Six', points: 12, type: 'event', count: 1, rarity: 'legendary', category: 'defensive' },
-                    { name: 'Hail Mary', points: 10, type: 'event', count: 1, rarity: 'legendary' },
-                    { name: 'Blocked Kick', points: 4, type: 'event', count: 2, rarity: 'rare', category: 'defensive' },
-                    { name: 'Two-Point Conversion', points: 2, type: 'event', count: 2, rarity: 'rare' },
+                    { name: 'Hail Mary', points: 12, type: 'event', count: 1, rarity: 'legendary' },
+                    { name: 'Blocked Kick', points: 5, type: 'event', count: 2, rarity: 'rare', category: 'defensive' },
+                    { name: 'Two-Point Conversion', points: 3, type: 'event', count: 2, rarity: 'uncommon' },
                     { name: 'Red Zone Stop', points: 6, type: 'defensive', count: 2, rarity: 'uncommon' }
                 ];
                 
@@ -521,23 +635,23 @@ body {
                 const descriptions = {
                     'Touchdown': 'Player scores in the end zone',
                     'Field Goal': 'Successful kick through uprights',
-                    'Interception': 'Defense catches offensive pass',
-                    'Sack': 'QB tackled behind line of scrimmage',
-                    'Safety': 'Offensive player tackled in own end zone',
-                    'Penalty': 'Referee calls infraction',
-                    'First Down': 'Team advances 10+ yards',
-                    'Punt': 'Team kicks ball away on 4th down',
-                    'Double Next': 'Next event card worth 2x points',
-                    'Draw Cards': 'Draw 2 additional cards',
-                    'Combo Boost': 'Instant +3 points (more with chain bonus)',
-                    'Fumble Recovery': 'Defense recovers loose ball',
-                    'Pick Six': 'Interception returned for TD',
-                    'Hail Mary': 'Long desperate touchdown pass',
-                    'Blocked Kick': 'Defense blocks field goal or punt',
-                    'Two-Point Conversion': 'Team goes for 2 after TD',
-                    'Red Zone Stop': 'Defense prevents TD in red zone'
+                    'Interception': 'Defense catches offensive pass - consecutive defensive plays increase point multipliers',
+                    'Sack': 'QB tackled behind line of scrimmage for a loss - consecutive defensive plays increase point multipliers',
+                    'Safety': 'Offensive player tackled in own end zone or intentional grounding in end zone',
+                    'Penalty': 'Referee throws penalty flag',
+                    'First Down': 'Team gets a first down including on a penalty',
+                    'Punt': 'Team punts on 4th down',
+                    'Double Next': 'Play this card then your next event card will score 2x points',
+                    'Draw Cards': 'Add 2 cards to your hand (up to 10 card limit)',
+                    'Combo Boost': 'Gain 3 points immediately (multiplied by defensive chain bonus if active)',
+                    'Fumble Recovery': 'Defense recovers loose ball (includes forced fumbles and muffed punts) - consecutive defensive plays increase point multipliers',
+                    'Pick Six': 'Interception returned for touchdown - consecutive defensive plays increase point multipliers',
+                    'Hail Mary': 'Long touchdown pass (40+ yards)',
+                    'Blocked Kick': 'Defense blocks field goal attempt, extra point, or punt - consecutive defensive plays increase point multipliers',
+                    'Two-Point Conversion': 'Team attempts 2-point conversion',
+                    'Red Zone Stop': 'Offense fails to get any score in the red zone - including at end of half/game. Consecutive defensive plays increase point multipliers'
                 };
-                return descriptions[cardName] || 'Special card effect';
+                return descriptions[cardName];
             }
             
             shuffleDeck(deck) {
@@ -561,6 +675,7 @@ body {
                 document.getElementById('start-btn').onclick = () => this.startGame();
                 document.getElementById('end-game-btn').onclick = () => this.endGame();
                 document.getElementById('undo-btn').onclick = () => this.undoLastPlay();
+                document.getElementById('modal-continue-btn').onclick = () => this.closeEndGameModal();
             }
             
             startGame() {
@@ -576,9 +691,15 @@ body {
                 this.hand.splice(cardIndex, 1);
                 this.cardsPlayed++;
                 
+                // Add card to discard pile
+                this.discardPile.push(card);
+                
                 this.processCard(card);
                 
                 if (this.hand.length <= 2 && this.cards.length > 0) {
+                    this.drawToHandSize(7);
+                } else if (this.hand.length <= 2 && this.cards.length === 0 && this.discardPile.length > 0) {
+                    this.reshuffleDiscardPile();
                     this.drawToHandSize(7);
                 }
                 
@@ -653,6 +774,19 @@ body {
                 this.showMessage(`🛡️ ${card.name}! +${points} points!`, 'success');
             }
             
+            reshuffleDiscardPile() {
+                if (this.discardPile.length === 0) return;
+                
+                // Move all discarded cards back to deck
+                this.cards = [...this.discardPile];
+                this.discardPile = [];
+                
+                // Shuffle the deck
+                this.cards = this.shuffleDeck(this.cards);
+                
+                this.showMessage('♻️ Deck empty! Reshuffling played cards...', 'info');
+            }
+            
             drawExtraCards(count) {
                 for (let i = 0; i < count && this.cards.length > 0 && this.hand.length < 10; i++) {
                     this.hand.push(this.cards.pop());
@@ -660,6 +794,11 @@ body {
             }
             
             drawToHandSize(targetSize) {
+                // Check if we need to reshuffle before drawing
+                if (this.cards.length === 0 && this.discardPile.length > 0) {
+                    this.reshuffleDiscardPile();
+                }
+                
                 const cardsToDraw = Math.min(targetSize - this.hand.length, this.cards.length);
                 for (let i = 0; i < cardsToDraw; i++) {
                     this.hand.push(this.cards.pop());
@@ -675,13 +814,6 @@ body {
                     const bonus = 5;
                     this.score += bonus;
                     this.showMessage(`🎯 ${this.cardsPlayed} Cards Milestone! +${bonus} bonus points!`, 'success');
-                }
-                
-                const lastCard = this.playHistory[this.playHistory.length - 1]?.card;
-                if (lastCard && (lastCard.points >= 7 || lastCard.rarity === 'legendary')) {
-                    const highValueBonus = lastCard.rarity === 'legendary' ? 4 : 2;
-                    this.score += highValueBonus;
-                    this.showMessage(`⭐ ${lastCard.rarity === 'legendary' ? 'Legendary' : 'High-Value'} Card Bonus! +${highValueBonus} points!`, 'success');
                 }
                 
                 if (this.defensiveChain >= 3 && this.defensiveChain % 3 === 0) {
@@ -703,9 +835,16 @@ body {
                 this.defensiveChain = lastPlay.defensiveChainBefore;
                 this.chainMultiplier = lastPlay.chainMultiplierBefore;
                 
+                // Remove card from discard pile and put back in hand
+                const cardIndex = this.discardPile.findIndex(card => card.id === lastPlay.card.id);
+                if (cardIndex !== -1) {
+                    this.discardPile.splice(cardIndex, 1);
+                }
+                
                 this.hand.splice(lastPlay.cardIndex, 0, lastPlay.card);
                 
-                if (this.hand.length > 7) {
+                // If hand is over 7 cards, put extras back in deck
+                while (this.hand.length > 7) {
                     this.cards.push(this.hand.pop());
                 }
                 
@@ -738,14 +877,15 @@ body {
                 container.classList.remove('at-limit');
                 statusEl.style.display = 'none';
                 
-                // Show hand status notifications
-                if (this.hand.length >= 10 && this.cards.length > 0) {
+                // Show hand status notifications  
+                const hasCards = this.cards.length > 0 || this.discardPile.length > 0;
+                if (this.hand.length >= 10 && hasCards) {
                     const drawCount = Math.min(7 - (this.hand.length - 1), this.cards.length);
                     statusEl.textContent = `⚠️ Hand Full! Playing a card will draw ${drawCount} more`;
                     statusEl.className = 'hand-notification hand-full';
                     statusEl.style.display = 'block';
                     container.classList.add('at-limit');
-                } else if (this.hand.length >= 3 && this.hand.length <= 4 && this.cards.length > 0) {
+                } else if (this.hand.length <= 4 && this.hand.length >= 3 && hasCards) {
                     const cardsToPlay = 3 - this.hand.length;
                     if (cardsToPlay === 1) {
                         statusEl.textContent = `📋 Low Hand - Play one more card and you will automatically draw back to 7`;
@@ -790,9 +930,7 @@ body {
                 document.getElementById('current-score').textContent = this.score;
                 document.getElementById('cards-played').textContent = this.cardsPlayed;
                 document.getElementById('cards-remaining').textContent = this.cards.length;
-                
-                const nextMilestone = Math.ceil((this.cardsPlayed + 1) / 10) * 10;
-                document.getElementById('next-milestone').textContent = nextMilestone;
+                document.getElementById('next-milestone').textContent = Math.ceil((this.cardsPlayed + 1) / 10) * 10;
             }
             
             updateComboDisplay() {
@@ -822,33 +960,36 @@ body {
             }
             
             endGame() {
-                const finalScore = this.score;
+                const baseScore = this.score;
+                const cardsInHand = this.hand.length;
+                const handPenalty = cardsInHand;
                 
-                let efficiencyBonus = 0;
-                if (this.hand.length === 0) {
-                    efficiencyBonus = 10;
-                } else if (this.hand.length === 1) {
-                    efficiencyBonus = 5;
-                } else if (this.hand.length === 2) {
-                    efficiencyBonus = 2;
-                }
+                // Calculate final score (just base score minus hand penalty)
+                const finalScore = baseScore - handPenalty;
+                this.score = finalScore;
                 
-                this.score += efficiencyBonus;
-                const totalScore = this.score;
-                const isNewBest = totalScore > this.personalBest;
+                const isNewBest = finalScore > this.personalBest;
                 
                 this.updateStats();
                 this.saveStats();
                 
-                let message = `Game Over! Final Score: ${totalScore}`;
-                if (efficiencyBonus > 0) {
-                    message += ` (includes +${efficiencyBonus} efficiency bonus!)`;
-                }
-                if (isNewBest) {
-                    message += ' 🏆 NEW PERSONAL BEST!';
-                }
+                // Show end game modal
+                this.showEndGameModal(baseScore, cardsInHand, handPenalty, finalScore, isNewBest);
+            }
+            
+            showEndGameModal(baseScore, cardsInHand, handPenalty, finalScore, isNewBest) {
+                document.getElementById('modal-base-score').textContent = baseScore;
+                document.getElementById('modal-hand-penalty').textContent = `${cardsInHand} cards × -1 = -${handPenalty}`;
+                document.getElementById('modal-final-score').textContent = finalScore;
                 
-                this.showMessage(message, isNewBest ? 'success' : 'info');
+                const newBestEl = document.getElementById('modal-new-best');
+                newBestEl.style.display = isNewBest ? 'block' : 'none';
+                
+                document.getElementById('end-game-modal').style.display = 'flex';
+            }
+            
+            closeEndGameModal() {
+                document.getElementById('end-game-modal').style.display = 'none';
                 this.resetGame();
                 this.showScreen('welcome-screen');
             }
@@ -880,6 +1021,7 @@ body {
                 this.cardsPlayed = 0;
                 this.defensiveChain = 0;
                 this.playHistory = [];
+                this.discardPile = [];
                 this.cards = this.generateCards();
                 this.dealHand();
                 this.updateStatsDisplay();
