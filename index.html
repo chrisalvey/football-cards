@@ -14,9 +14,15 @@
                 <h1>🏈 Football Cards</h1>
             </div>
             
-            <button id="start-btn" class="btn btn-primary">Start Playing</button>
+            <div class="button-group">
+                <button id="start-btn" class="btn btn-primary">Start Playing</button>
+            </div>
             
-            <div class="setup-info">
+            <div id="personal-stats" class="setup-info" style="margin-top: 20px;">
+                <div class="stats-row">
+                    <span class="stat-label">Personal Best:</span>
+                    <span class="stat-value" id="best-score">0</span>
+                </div>
                 <div class="stats-row">
                     <span class="stat-label">Games Played:</span>
                     <span class="stat-value" id="total-games">0</span>
@@ -26,12 +32,12 @@
                     <span class="stat-value" id="avg-score">0</span>
                 </div>
                 
-                <div class="rarity-guide">
-                    <div class="rarity-title">Card Rarity Guide</div>
-                    <div class="rarity-icons">
-                        <div><span>💎</span><br>Uncommon</div>
-                        <div><span>⭐</span><br>Rare</div>
-                        <div><span>🏆</span><br>Legendary</div>
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2); font-size: 0.9em; opacity: 0.8;">
+                    <div style="text-align: center; margin-bottom: 8px; font-weight: 600;">Card Rarity Guide</div>
+                    <div style="display: flex; justify-content: space-around; text-align: center;">
+                        <div><span style="font-size: 1.2em;">💎</span><br>Uncommon</div>
+                        <div><span style="font-size: 1.2em;">⭐</span><br>Rare</div>
+                        <div><span style="font-size: 1.2em;">🏆</span><br>Legendary</div>
                     </div>
                 </div>
             </div>
@@ -45,13 +51,13 @@
             </div>
 
             <!-- Combo System -->
-            <div class="combo-section" id="combo-section">
+            <div class="combo-section" id="combo-section" style="display: none;">
                 <div class="combo-multiplier" id="combo-multiplier">2x COMBO!</div>
                 <div class="combo-description" id="combo-description">Next event card worth double points!</div>
             </div>
 
             <!-- Chain System -->
-            <div class="chain-section" id="chain-section">
+            <div class="chain-section" id="chain-section" style="display: none;">
                 <div class="chain-counter" id="chain-counter">🔗 CHAIN x2</div>
                 <div class="combo-description" id="chain-description">Defensive momentum building!</div>
             </div>
@@ -63,15 +69,23 @@
                     <span class="stat-value" id="current-score">0</span>
                 </div>
                 <div class="stats-row">
-                    <span class="stat-label">Bonus Progress:</span>
-                    <span class="stat-value" id="next-milestone">0/10</span>
+                    <span class="stat-label">Cards Played:</span>
+                    <span class="stat-value" id="cards-played">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stat-label">Cards Left:</span>
+                    <span class="stat-value" id="cards-remaining">60</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stat-label">Progress:</span>
+                    <span class="stat-value" id="next-milestone">0 → 10</span>
                 </div>
             </div>
 
             <!-- Player Hand -->
             <div class="hand-section">
                 <h3>Your Cards</h3>
-                <div id="hand-status" class="hand-notification"></div>
+                <div id="hand-status" class="hand-notification" style="display: none;"></div>
                 <div id="player-hand" class="hand-cards"></div>
             </div>
 
@@ -85,7 +99,7 @@
         <div id="message-container" class="message-container"></div>
 
         <!-- End Game Modal -->
-        <div id="end-game-modal" class="modal-overlay">
+        <div id="end-game-modal" class="modal-overlay" style="display: none;">
             <div class="modal-content">
                 <div class="modal-title">🏈 Game Complete!</div>
                 
@@ -96,12 +110,16 @@
                     </div>
                     <div class="score-line">
                         <span class="score-label">Cards in Hand:</span>
-                        <span class="score-value" id="modal-hand-penalty">0 cards = 0</span>
+                        <span class="score-value" id="modal-hand-penalty">0 cards × -1 = 0</span>
                     </div>
                     <div class="score-line total">
                         <span class="score-label">Final Score:</span>
                         <span class="score-value" id="modal-final-score">0</span>
                     </div>
+                </div>
+
+                <div id="modal-new-best" class="new-best" style="display: none;">
+                    🏆 NEW PERSONAL BEST!
                 </div>
 
                 <button id="modal-continue-btn" class="btn btn-primary">Continue</button>
