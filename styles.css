@@ -324,9 +324,9 @@ body {
 }
 
 .hand-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
     margin-bottom: 20px;
 }
 
@@ -342,24 +342,54 @@ body {
     background: rgba(255,255,255,0.1);
     border: 2px solid rgba(255,255,255,0.2);
     border-radius: 12px;
-    padding: 15px;
+    padding: 20px;
     cursor: pointer;
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
+    min-height: 100px;
+    touch-action: pan-y;
+    user-select: none;
 }
 
-.card.event {
-    border-left: 4px solid #4CAF50;
-}
-
-.card.action {
-    border-left: 4px solid #ff9800;
+.card:hover, .card:active {
+    background: rgba(255,255,255,0.15);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
 }
 
 .card.defensive {
     border-left: 4px solid #f44336;
-    background: rgba(244,67,54,0.1);
+    background: linear-gradient(135deg, rgba(244,67,54,0.15), rgba(244,67,54,0.05));
+    position: relative;
+}
+
+.card.defensive::before {
+    content: "🛡️";
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-size: 16px;
+    z-index: 1;
+}
+
+.card.event {
+    border-left: 4px solid #4CAF50;
+    background: linear-gradient(135deg, rgba(76,175,80,0.15), rgba(76,175,80,0.05));
+    position: relative;
+}
+
+.card.event::before {
+    content: "⚡";
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-size: 16px;
+    z-index: 1;
+}
+
+.card.action {
+    border-left: 4px solid #ff9800;
 }
 
 .card.special {
@@ -370,12 +400,6 @@ body {
 .discard-card-style {
     border: 2px solid #9c27b0 !important;
     background: linear-gradient(45deg, rgba(156,39,176,0.15), rgba(156,39,176,0.05)) !important;
-}
-
-.card:hover {
-    background: rgba(255,255,255,0.15);
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
 }
 
 .card-header {
@@ -410,6 +434,7 @@ body {
     top: 8px;
     right: 8px;
     font-size: 16px;
+    z-index: 2;
 }
 
 /* Discard Modal */
@@ -505,10 +530,6 @@ body {
     animation: fadeIn 0.3s ease-in;
 }
 
-.modal-overlay.active {
-    display: flex;
-}
-
 .modal-content {
     background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
     border: 2px solid rgba(255,255,255,0.3);
@@ -563,28 +584,6 @@ body {
 
 .score-value {
     font-weight: 600;
-}
-
-.new-best {
-    background: rgba(76,175,80,0.2);
-    border: 2px solid #4CAF50;
-    border-radius: 8px;
-    padding: 10px;
-    margin: 15px 0;
-    font-weight: bold;
-    color: #4CAF50;
-    animation: pulse 2s infinite;
-    display: none;
-}
-
-.new-best.active {
-    display: block;
-}
-
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.8; }
-    100% { opacity: 1; }
 }
 
 /* Mobile Responsiveness */

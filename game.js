@@ -19,13 +19,11 @@ class FootballGame {
     }
     
     loadStats() {
-        this.personalBest = parseInt(localStorage.getItem('football_best') || '0');
         this.gamesPlayed = parseInt(localStorage.getItem('football_games') || '0');
         this.averageScore = parseInt(localStorage.getItem('football_avg') || '0');
     }
     
     saveStats() {
-        localStorage.setItem('football_best', this.personalBest.toString());
         localStorage.setItem('football_games', this.gamesPlayed.toString());
         localStorage.setItem('football_avg', this.averageScore.toString());
     }
@@ -56,7 +54,7 @@ class FootballGame {
             { name: 'Combo Boost', points: 0, type: 'action', count: 2, rarity: 'uncommon' },
             { name: 'Fumble Recovery', points: 4, type: 'event', count: 3, rarity: 'uncommon', category: 'defensive' },
             { name: 'Pick Six', points: 12, type: 'event', count: 1, rarity: 'legendary', category: 'defensive' },
-            { name: 'Hail Mary', points: 12, type: 'event', count: 1, rarity: 'legendary' },
+            { name: 'Long Bomb', points: 12, type: 'event', count: 1, rarity: 'legendary' },
             { name: 'Blocked Kick', points: 5, type: 'event', count: 2, rarity: 'rare', category: 'defensive' },
             { name: 'Two-Point Conversion', points: 3, type: 'event', count: 1, rarity: 'rare' },
             { name: 'Red Zone Stop', points: 6, type: 'defensive', count: 1, rarity: 'rare' },
@@ -103,7 +101,7 @@ class FootballGame {
             'Combo Boost': 'Gain 3 points immediately - if you have a defensive chain active, these points are multiplied by your current chain bonus',
             'Fumble Recovery': 'Opposing team recovers a fumble, resulting in change of possession (includes muffed punts - excludes same team recovering own fumble) - consecutive defensive plays increase point multipliers',
             'Pick Six': 'Interception returned for touchdown - consecutive defensive plays increase point multipliers',
-            'Hail Mary': 'Long touchdown pass (40+ yards)',
+            'Long Bomb': 'Long touchdown pass (40+ yards)',
             'Blocked Kick': 'Defense blocks field goal attempt, extra point, or punt - consecutive defensive plays increase point multipliers',
             'Two-Point Conversion': 'Team attempts 2-point conversion',
             'Red Zone Stop': 'Offense fails to get any score in the red zone - including at end of half/game. Consecutive defensive plays increase point multipliers',
@@ -475,7 +473,18 @@ class FootballGame {
             cardDiv.classList.add('discard-card-style');
         }
         
+        // Add card type icon and styling
+        if (card.category === 'defensive' || card.type === 'defensive') {
+            cardDiv.classList.add('defensive');
+        } else if (card.type === 'event') {
+            cardDiv.classList.add('event');
+        }
+        
+        // Add click handler
         cardDiv.onclick = () => this.playCard(originalIndex);
+        
+        // Add swipe gesture handlers
+        this.addSwipeHandlers(cardDiv, originalIndex);
         
         const pointsDisplay = card.points === 0 ? 'Special' : `${card.points} pts`;
         const rarityIcon = this.getRarityIcon(card.rarity);
@@ -492,6 +501,58 @@ class FootballGame {
         return cardDiv;
     }
     
+    addSwipeHandlers(element, cardIndex) {
+        let startX = 0;
+        let startY = 0;
+        let moved = false;
+        
+        element.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            moved = false;
+        });
+        
+        element.addEventListener('touchmove', (e) => {
+            if (!moved) {
+                const currentX = e.touches[0].clientX;
+                const currentY = e.touches[0].clientY;
+                const diffX = Math.abs(currentX - startX);
+                const diffY = Math.abs(currentY - startY);
+                
+                if (diffX > 10 || diffY > 10) {
+                    moved = true;
+                }
+            }
+        });
+        
+        element.addEventListener('touchend', (e) => {
+            if (!moved) return; // This was a tap, not a swipe
+            
+            const endX = e.changedTouches[0].clientX;
+            const endY = e.changedTouches[0].clientY;
+            const diffX = endX - startX;
+            const diffY = endY - startY;
+            
+            // Check if horizontal swipe is longer than vertical
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                // Horizontal swipe detected (left or right)
+                this.playCard(cardIndex);
+                
+                // Visual feedback for swipe
+                element.style.transform = diffX > 0 ? 'translateX(100px)' : 'translateX(-100px)';
+                element.style.opacity = '0.5';
+                
+                setTimeout(() => {
+                    element.style.transform = '';
+                    element.style.opacity = '';
+                }, 200);
+            }
+        });
+        
+        // Prevent default to avoid scrolling issues
+        element.addEventListener('touchstart', (e) => e.preventDefault());
+    }
+    
     getRarityIcon(rarity) {
         const icons = {
             'uncommon': '💎',
@@ -503,10 +564,9 @@ class FootballGame {
     
     updateDisplay() {
         document.getElementById('current-score').textContent = this.score;
-        document.getElementById('cards-played').textContent = this.cardsPlayed;
-        document.getElementById('cards-remaining').textContent = this.cards.length;
-        document.getElementById('next-milestone').textContent = 
-            `${this.cardsPlayed} → ${Math.ceil((this.cardsPlayed + 1) / 10) * 10}`;
+        
+        const nextMilestone = Math.ceil((this.cardsPlayed + 1) / 10) * 10;
+        document.getElementById('next-milestone').textContent = `${this.cardsPlayed}/${nextMilestone}`;
         
         this.checkMilestoneApproach();
     }
@@ -573,22 +633,18 @@ class FootballGame {
         const finalScore = baseScore - handPenalty;
         
         this.score = finalScore;
-        const isNewBest = finalScore > this.personalBest;
         
         this.updateStats();
         this.saveStats();
-        this.showEndGameModal(baseScore, cardsInHand, handPenalty, finalScore, isNewBest);
+        this.showEndGameModal(baseScore, cardsInHand, handPenalty, finalScore);
     }
     
     updateStats() {
-        if (this.score > this.personalBest) {
-            this.personalBest = this.score;
-        }
         this.gamesPlayed++;
         this.averageScore = Math.round(((this.averageScore * (this.gamesPlayed - 1)) + this.score) / this.gamesPlayed);
     }
     
-    showEndGameModal(baseScore, cardsInHand, handPenalty, finalScore, isNewBest) {
+    showEndGameModal(baseScore, cardsInHand, handPenalty, finalScore) {
         document.getElementById('modal-base-score').textContent = baseScore;
         
         if (cardsInHand > 0) {
@@ -601,18 +657,13 @@ class FootballGame {
         
         document.getElementById('modal-final-score').textContent = finalScore;
         
-        const newBestEl = document.getElementById('modal-new-best');
-        if (isNewBest) {
-            newBestEl.classList.add('active');
-        } else {
-            newBestEl.classList.remove('active');
-        }
-        
-        document.getElementById('end-game-modal').classList.add('active');
+        const modal = document.getElementById('end-game-modal');
+        modal.style.display = 'flex';
     }
     
     closeEndGameModal() {
-        document.getElementById('end-game-modal').classList.remove('active');
+        const modal = document.getElementById('end-game-modal');
+        modal.style.display = 'none';
         this.resetGameState();
         this.dealHand();
         this.showScreen('welcome-screen');
@@ -620,7 +671,6 @@ class FootballGame {
     }
     
     updateStatsDisplay() {
-        document.getElementById('best-score').textContent = this.personalBest;
         document.getElementById('total-games').textContent = this.gamesPlayed;
         document.getElementById('avg-score').textContent = this.averageScore;
     }
