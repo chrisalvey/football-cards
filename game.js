@@ -1,22 +1,33 @@
 class FootballGame {
     constructor() {
+        this.resetGameState();
+        this.loadStats();
+        this.init();
+    }
+    
+    resetGameState() {
         this.score = 0;
         this.comboMultiplier = 1;
         this.chainMultiplier = 1;
         this.cardsPlayed = 0;
         this.defensiveChain = 0;
-        this.cards = this.generateCards();
         this.hand = [];
         this.playHistory = [];
         this.discardPile = [];
         this.hasStarterDiscardCard = false;
-        
-        // Use localStorage for persistent stats
+        this.cards = this.generateCards();
+    }
+    
+    loadStats() {
         this.personalBest = parseInt(localStorage.getItem('football_best') || '0');
         this.gamesPlayed = parseInt(localStorage.getItem('football_games') || '0');
         this.averageScore = parseInt(localStorage.getItem('football_avg') || '0');
-        
-        this.init();
+    }
+    
+    saveStats() {
+        localStorage.setItem('football_best', this.personalBest.toString());
+        localStorage.setItem('football_games', this.gamesPlayed.toString());
+        localStorage.setItem('football_avg', this.averageScore.toString());
     }
     
     init() {
@@ -35,6 +46,11 @@ class FootballGame {
             { name: 'Penalty', points: 2, type: 'event', count: 4, rarity: 'common' },
             { name: 'First Down', points: 1, type: 'event', count: 8, rarity: 'common' },
             { name: 'Punt', points: 1, type: 'event', count: 5, rarity: 'common' },
+            { name: 'Running Play', points: 1, type: 'event', count: 10, rarity: 'common' },
+            { name: 'Completed Pass', points: 2, type: 'event', count: 8, rarity: 'common' },
+            { name: 'Incomplete Pass', points: 2, type: 'event', count: 8, rarity: 'common' },
+            { name: 'Timeout', points: 1, type: 'event', count: 6, rarity: 'common' },
+            { name: 'Third Down Conversion', points: 3, type: 'event', count: 4, rarity: 'uncommon' },
             { name: 'Double Next', points: 0, type: 'action', count: 3, rarity: 'uncommon' },
             { name: 'Draw Cards', points: 0, type: 'action', count: 3, rarity: 'uncommon' },
             { name: 'Combo Boost', points: 0, type: 'action', count: 2, rarity: 'uncommon' },
@@ -43,11 +59,13 @@ class FootballGame {
             { name: 'Hail Mary', points: 12, type: 'event', count: 1, rarity: 'legendary' },
             { name: 'Blocked Kick', points: 5, type: 'event', count: 2, rarity: 'rare', category: 'defensive' },
             { name: 'Two-Point Conversion', points: 3, type: 'event', count: 1, rarity: 'rare' },
-            { name: 'Red Zone Stop', points: 6, type: 'defensive', count: 2, rarity: 'uncommon' },
+            { name: 'Red Zone Stop', points: 6, type: 'defensive', count: 1, rarity: 'rare' },
+            { name: 'End of Quarter', points: 4, type: 'event', count: 4, rarity: 'uncommon' },
+            { name: 'Challenge Flag', points: 12, type: 'event', count: 2, rarity: 'rare' },
             { name: 'Discard', points: 0, type: 'special', count: 5, rarity: 'uncommon' }
         ];
         
-        let deck = [];
+        const deck = [];
         cardTypes.forEach(cardType => {
             for (let i = 0; i < cardType.count; i++) {
                 deck.push({
@@ -75,6 +93,11 @@ class FootballGame {
             'Penalty': 'Referee throws penalty flag',
             'First Down': 'Offensive team earns first down through yardage gained or penalty (excludes possession changes)',
             'Punt': 'Team punts on 4th down',
+            'Running Play': 'Ball carrier attempts to advance by running (includes handoffs and direct snaps)',
+            'Completed Pass': 'Pass attempt successfully caught by intended receiver',
+            'Incomplete Pass': 'Pass attempt falls incomplete - not caught by intended receiver',
+            'Timeout': 'Team or referee stops the game clock (includes injury timeouts)',
+            'Third Down Conversion': 'Team successfully gets first down on 3rd down attempt',
             'Double Next': 'Play this card then your next event card will score 2x points',
             'Draw Cards': 'Add 2 cards to your hand (up to 10 card limit)',
             'Combo Boost': 'Gain 3 points immediately - if you have a defensive chain active, these points are multiplied by your current chain bonus',
@@ -84,6 +107,8 @@ class FootballGame {
             'Blocked Kick': 'Defense blocks field goal attempt, extra point, or punt - consecutive defensive plays increase point multipliers',
             'Two-Point Conversion': 'Team attempts 2-point conversion',
             'Red Zone Stop': 'Offense fails to get any score in the red zone - including at end of half/game. Consecutive defensive plays increase point multipliers',
+            'End of Quarter': 'Quarter ends (1st, 2nd, 3rd quarter, or end of game)',
+            'Challenge Flag': 'Coach throws challenge flag to dispute referee call (12 points regardless of outcome)',
             'Discard': 'Choose one card from your hand to return to the deck (one-time use)'
         };
         return descriptions[cardName];
@@ -100,14 +125,14 @@ class FootballGame {
     dealHand() {
         this.hand = [];
         
-        // Add starter discard card if this is a new game
+        // Add starter discard card
         if (!this.hasStarterDiscardCard) {
             this.hand.push({
                 id: 'starter_discard',
                 name: 'Discard',
                 points: 0,
                 type: 'special',
-                rarity: 'starter',
+                rarity: 'uncommon',
                 category: 'special',
                 description: 'Choose one card from your hand to return to the deck (one-time use)'
             });
@@ -140,7 +165,7 @@ class FootballGame {
         
         const card = this.hand[cardIndex];
         
-        // Handle discard card specially
+        // Handle discard card
         if (card.type === 'special' && card.name === 'Discard') {
             this.showDiscardModal(cardIndex);
             return;
@@ -149,22 +174,121 @@ class FootballGame {
         this.saveToHistory(card, cardIndex);
         this.hand.splice(cardIndex, 1);
         this.cardsPlayed++;
-        
-        // Add card to discard pile
         this.discardPile.push(card);
         
         this.processCard(card);
+        this.autoDrawCards();
+        this.displayHand();
+        this.updateDisplay();
+        this.checkMilestoneBonus();
+    }
+    
+    processCard(card) {
+        // Handle defensive chain
+        if (card.category === 'defensive' || card.type === 'defensive') {
+            this.defensiveChain++;
+            this.chainMultiplier = this.defensiveChain >= 2 ? 
+                Math.min(1 + ((this.defensiveChain - 1) * 0.5), 3) : 1;
+        } else {
+            this.defensiveChain = 0;
+            this.chainMultiplier = 1;
+        }
         
+        // Process card by type
+        switch (card.type) {
+            case 'event':
+                this.handleEventCard(card);
+                break;
+            case 'action':
+                this.handleActionCard(card);
+                break;
+            case 'defensive':
+                this.handleDefensiveCard(card);
+                break;
+        }
+        
+        this.updateComboDisplay();
+    }
+    
+    handleEventCard(card) {
+        const multiplier = this.comboMultiplier * this.chainMultiplier;
+        const points = Math.round(card.points * multiplier);
+        this.score += points;
+        
+        let message = `${card.name} for ${points} points!`;
+        if (multiplier > 1) {
+            message += ` (${multiplier.toFixed(1)}x multiplier!)`;
+        }
+        if (card.rarity === 'legendary') {
+            message = `🌟 LEGENDARY! ${message}`;
+        }
+        
+        this.showMessage(message, card.rarity === 'legendary' ? 'special' : 'success');
+        this.comboMultiplier = 1;
+    }
+    
+    handleActionCard(card) {
+        switch (card.name) {
+            case 'Double Next':
+                this.comboMultiplier = 2;
+                this.showMessage('Next event card worth DOUBLE points!', 'success');
+                break;
+            case 'Draw Cards':
+                this.drawExtraCards(2);
+                this.showMessage('Drew 2 extra cards!', 'success');
+                break;
+            case 'Combo Boost':
+                const bonus = Math.round(3 * this.chainMultiplier);
+                this.score += bonus;
+                this.showMessage(`Combo Boost! +${bonus} immediate points!`, 'success');
+                break;
+        }
+    }
+    
+    handleDefensiveCard(card) {
+        const points = Math.round(card.points * this.chainMultiplier);
+        this.score += points;
+        this.showMessage(`🛡️ ${card.name}! +${points} points!`, 'success');
+    }
+    
+    autoDrawCards() {
         if (this.hand.length <= 2 && this.cards.length > 0) {
             this.drawToHandSize(7);
         } else if (this.hand.length <= 2 && this.cards.length === 0 && this.discardPile.length > 0) {
             this.reshuffleDiscardPile();
             this.drawToHandSize(7);
         }
+    }
+    
+    reshuffleDiscardPile() {
+        if (this.discardPile.length === 0) return;
         
-        this.displayHand();
-        this.updateDisplay();
-        this.checkMilestoneBonus();
+        this.cards = [...this.discardPile];
+        this.discardPile = [];
+        this.cards = this.shuffleDeck(this.cards);
+        
+        this.showMessage('♻️ Deck empty! Reshuffling played cards...', 'info');
+    }
+    
+    drawExtraCards(count) {
+        for (let i = 0; i < count && this.cards.length > 0 && this.hand.length < 10; i++) {
+            this.hand.push(this.cards.pop());
+        }
+    }
+    
+    drawToHandSize(targetSize) {
+        if (this.cards.length === 0 && this.discardPile.length > 0) {
+            this.reshuffleDiscardPile();
+        }
+        
+        const cardsToDraw = Math.min(targetSize - this.hand.length, this.cards.length);
+        for (let i = 0; i < cardsToDraw; i++) {
+            this.hand.push(this.cards.pop());
+        }
+        
+        if (cardsToDraw > 0) {
+            this.showMessage(`Drew ${cardsToDraw} cards!`, 'info');
+        }
     }
     
     showDiscardModal(discardCardIndex) {
@@ -176,11 +300,11 @@ class FootballGame {
         }
         
         const modal = document.createElement('div');
-        modal.className = 'modal-overlay';
+        modal.className = 'modal-overlay active';
         modal.id = 'discard-modal';
         
         let cardHtml = '<h3>Choose a Card to Discard</h3><div class="discard-cards-grid">';
-        otherCards.forEach((card, index) => {
+        otherCards.forEach(card => {
             const actualIndex = this.hand.findIndex(c => c.id === card.id);
             const pointsDisplay = card.points === 0 ? 'Special' : `${card.points} pts`;
             const rarityIcon = this.getRarityIcon(card.rarity);
@@ -212,7 +336,6 @@ class FootballGame {
         if (cardToDiscardIndex < 0 || cardToDiscardIndex >= this.hand.length) return;
         
         const cardToDiscard = this.hand[cardToDiscardIndex];
-        const discardCard = this.hand[discardCardIndex];
         
         // Remove both cards from hand
         if (cardToDiscardIndex > discardCardIndex) {
@@ -223,120 +346,16 @@ class FootballGame {
             this.hand.splice(cardToDiscardIndex, 1);
         }
         
-        // Put discarded card back into deck and shuffle
+        // Put discarded card back into deck
         this.cards.push(cardToDiscard);
         this.cards = this.shuffleDeck(this.cards);
         
         // Close modal
-        const modal = document.getElementById('discard-modal');
-        if (modal) modal.remove();
+        document.getElementById('discard-modal').remove();
         
         this.showMessage(`Discarded ${cardToDiscard.name} back to deck`, 'info');
-        
         this.displayHand();
         this.updateDisplay();
-    }
-    
-    processCard(card) {
-        if (card.category === 'defensive' || card.type === 'defensive') {
-            this.defensiveChain++;
-            // Multiplier only applies starting from the 2nd consecutive defensive card
-            this.chainMultiplier = this.defensiveChain >= 2 ? Math.min(1 + ((this.defensiveChain - 1) * 0.5), 3) : 1;
-        } else {
-            this.defensiveChain = 0;
-            this.chainMultiplier = 1;
-        }
-        
-        switch (card.type) {
-            case 'event':
-                this.handleEventCard(card);
-                break;
-            case 'action':
-                this.handleActionCard(card);
-                break;
-            case 'defensive':
-                this.handleDefensiveCard(card);
-                break;
-        }
-        
-        this.updateComboDisplay();
-    }
-    
-    handleEventCard(card) {
-        let multiplier = this.comboMultiplier * this.chainMultiplier;
-        let points = Math.round(card.points * multiplier);
-        this.score += points;
-        
-        let message = `${card.name} for ${points} points!`;
-        if (multiplier > 1) {
-            message += ` (${multiplier.toFixed(1)}x multiplier!)`;
-        }
-        
-        if (card.rarity === 'legendary') {
-            message = `🌟 LEGENDARY! ${message}`;
-        }
-        
-        this.showMessage(message, card.rarity === 'legendary' ? 'special' : 'success');
-        this.comboMultiplier = 1;
-    }
-    
-    handleActionCard(card) {
-        switch (card.name) {
-            case 'Double Next':
-                this.comboMultiplier = 2;
-                this.showMessage('Next event card worth DOUBLE points!', 'success');
-                break;
-            case 'Draw Cards':
-                this.drawExtraCards(2);
-                this.showMessage('Drew 2 extra cards!', 'success');
-                break;
-            case 'Combo Boost':
-                const immediateBonus = Math.round(3 * this.chainMultiplier);
-                this.score += immediateBonus;
-                this.showMessage(`Combo Boost! +${immediateBonus} immediate points!`, 'success');
-                break;
-        }
-    }
-    
-    handleDefensiveCard(card) {
-        let points = Math.round(card.points * this.chainMultiplier);
-        this.score += points;
-        this.showMessage(`🛡️ ${card.name}! +${points} points!`, 'success');
-    }
-    
-    reshuffleDiscardPile() {
-        if (this.discardPile.length === 0) return;
-        
-        // Move all discarded cards back to deck
-        this.cards = [...this.discardPile];
-        this.discardPile = [];
-        
-        // Shuffle the deck
-        this.cards = this.shuffleDeck(this.cards);
-        
-        this.showMessage('♻️ Deck empty! Reshuffling played cards...', 'info');
-    }
-    
-    drawExtraCards(count) {
-        for (let i = 0; i < count && this.cards.length > 0 && this.hand.length < 10; i++) {
-            this.hand.push(this.cards.pop());
-        }
-    }
-    
-    drawToHandSize(targetSize) {
-        // Check if we need to reshuffle before drawing
-        if (this.cards.length === 0 && this.discardPile.length > 0) {
-            this.reshuffleDiscardPile();
-        }
-        
-        const cardsToDraw = Math.min(targetSize - this.hand.length, this.cards.length);
-        for (let i = 0; i < cardsToDraw; i++) {
-            this.hand.push(this.cards.pop());
-        }
-        
-        if (cardsToDraw > 0) {
-            this.showMessage(`Drew ${cardsToDraw} cards!`, 'info');
-        }
     }
     
     checkMilestoneBonus() {
@@ -365,7 +384,7 @@ class FootballGame {
         this.defensiveChain = lastPlay.defensiveChainBefore;
         this.chainMultiplier = lastPlay.chainMultiplierBefore;
         
-        // Remove card from discard pile and put back in hand
+        // Restore card to hand
         const cardIndex = this.discardPile.findIndex(card => card.id === lastPlay.card.id);
         if (cardIndex !== -1) {
             this.discardPile.splice(cardIndex, 1);
@@ -373,7 +392,7 @@ class FootballGame {
         
         this.hand.splice(lastPlay.cardIndex, 0, lastPlay.card);
         
-        // If hand is over 7 cards, put extras back in deck
+        // Remove excess cards if over 7
         while (this.hand.length > 7) {
             this.cards.push(this.hand.pop());
         }
@@ -407,8 +426,31 @@ class FootballGame {
         container.classList.remove('at-limit');
         statusEl.style.display = 'none';
         
-        // Show hand status notifications  
+        // Show hand notifications
+        this.updateHandStatus(statusEl, container);
+        
+        // Sort cards by point value
+        const sortedHand = [...this.hand].map((card, originalIndex) => ({
+            card, originalIndex
+        })).sort((a, b) => {
+            if (a.card.points === 0 && b.card.points === 0) {
+                return a.card.name.localeCompare(b.card.name);
+            }
+            if (a.card.points === 0) return 1;
+            if (b.card.points === 0) return -1;
+            return a.card.points - b.card.points;
+        });
+        
+        // Display sorted cards
+        sortedHand.forEach(({card, originalIndex}) => {
+            const cardDiv = this.createCardElement(card, originalIndex);
+            container.appendChild(cardDiv);
+        });
+    }
+    
+    updateHandStatus(statusEl, container) {
         const hasCards = this.cards.length > 0 || this.discardPile.length > 0;
+        
         if (this.hand.length >= 10 && hasCards) {
             const drawCount = Math.min(7 - (this.hand.length - 1), this.cards.length);
             statusEl.textContent = `⚠️ Hand Full! Playing a card will draw ${drawCount} more`;
@@ -417,58 +459,37 @@ class FootballGame {
             container.classList.add('at-limit');
         } else if (this.hand.length <= 4 && this.hand.length >= 3 && hasCards) {
             const cardsToPlay = this.hand.length - 2;
-            if (cardsToPlay === 1) {
-                statusEl.textContent = `📋 Low Hand - Play one more card and you will automatically draw back to 7`;
-            } else {
-                statusEl.textContent = `📋 Low Hand - Play ${cardsToPlay} more cards and you will automatically draw back to 7`;
-            }
+            statusEl.textContent = cardsToPlay === 1 ? 
+                `📋 Low Hand - Play one more card and you will automatically draw back to 7` :
+                `📋 Low Hand - Play ${cardsToPlay} more cards and you will automatically draw back to 7`;
             statusEl.className = 'hand-notification hand-low';
             statusEl.style.display = 'block';
         }
+    }
+    
+    createCardElement(card, originalIndex) {
+        const cardDiv = document.createElement('div');
+        cardDiv.className = `card ${card.type}`;
         
-        // Sort cards by point value (lowest to highest), with special cards at the end
-        const sortedHand = [...this.hand].map((card, originalIndex) => ({
-            card,
-            originalIndex
-        })).sort((a, b) => {
-            // Special cards (0 points) go to the end
-            if (a.card.points === 0 && b.card.points === 0) {
-                // Among special cards, sort by name for consistency
-                return a.card.name.localeCompare(b.card.name);
-            }
-            if (a.card.points === 0) return 1;
-            if (b.card.points === 0) return -1;
-            
-            // Regular cards sorted by points (lowest first)
-            return a.card.points - b.card.points;
-        });
+        if (card.type === 'special' && card.name === 'Discard') {
+            cardDiv.classList.add('discard-card-style');
+        }
         
-        sortedHand.forEach(({card, originalIndex}) => {
-            const cardDiv = document.createElement('div');
-            cardDiv.className = `card ${card.type}`;
-            
-            // Special styling for discard cards
-            if (card.type === 'special' && card.name === 'Discard') {
-                cardDiv.classList.add('discard-card-style');
-            }
-            
-            // Use original index for click handler to maintain correct card references
-            cardDiv.onclick = () => this.playCard(originalIndex);
-            
-            const pointsDisplay = card.points === 0 ? 'Special' : `${card.points} pts`;
-            const rarityIcon = this.getRarityIcon(card.rarity);
-            
-            cardDiv.innerHTML = `
-                <div class="card-header">
-                    <span class="card-name">${card.name}</span>
-                    <span class="card-points">${pointsDisplay}</span>
-                </div>
-                <div class="card-description">${card.description}</div>
-                ${rarityIcon ? `<div class="card-rarity">${rarityIcon}</div>` : ''}
-            `;
-            
-            container.appendChild(cardDiv);
-        });
+        cardDiv.onclick = () => this.playCard(originalIndex);
+        
+        const pointsDisplay = card.points === 0 ? 'Special' : `${card.points} pts`;
+        const rarityIcon = this.getRarityIcon(card.rarity);
+        
+        cardDiv.innerHTML = `
+            <div class="card-header">
+                <span class="card-name">${card.name}</span>
+                <span class="card-points">${pointsDisplay}</span>
+            </div>
+            <div class="card-description">${card.description}</div>
+            ${rarityIcon ? `<div class="card-rarity">${rarityIcon}</div>` : ''}
+        `;
+        
+        return cardDiv;
     }
     
     getRarityIcon(rarity) {
@@ -484,28 +505,23 @@ class FootballGame {
         document.getElementById('current-score').textContent = this.score;
         document.getElementById('cards-played').textContent = this.cardsPlayed;
         document.getElementById('cards-remaining').textContent = this.cards.length;
-        document.getElementById('next-milestone').textContent = `${this.cardsPlayed} → ${Math.ceil((this.cardsPlayed + 1) / 10) * 10}`;
+        document.getElementById('next-milestone').textContent = 
+            `${this.cardsPlayed} → ${Math.ceil((this.cardsPlayed + 1) / 10) * 10}`;
         
-        // Check for milestone approach
         this.checkMilestoneApproach();
     }
     
     checkMilestoneApproach() {
         const nextMilestone = Math.ceil((this.cardsPlayed + 1) / 10) * 10;
         const cardsUntilMilestone = nextMilestone - this.cardsPlayed;
-        
         const approachBanner = document.getElementById('milestone-approach-banner');
         
         if (cardsUntilMilestone === 1) {
-            // Show approach notification
             if (!approachBanner) {
                 this.createMilestoneApproachBanner();
             }
-        } else {
-            // Hide approach notification
-            if (approachBanner) {
-                approachBanner.remove();
-            }
+        } else if (approachBanner) {
+            approachBanner.remove();
         }
     }
     
@@ -523,32 +539,28 @@ class FootballGame {
             </div>
         `;
         
-        // Insert banner before the game stats
         const gameStats = document.querySelector('.game-stats');
         gameStats.parentNode.insertBefore(banner, gameStats);
     }
     
     updateComboDisplay() {
         const comboSection = document.getElementById('combo-section');
-        const multiplierEl = document.getElementById('combo-multiplier');
-        const descriptionEl = document.getElementById('combo-description');
+        const chainSection = document.getElementById('chain-section');
         
+        // Combo display
         if (this.comboMultiplier > 1) {
             comboSection.style.display = 'block';
-            multiplierEl.textContent = `${this.comboMultiplier}x NEXT CARD!`;
-            descriptionEl.textContent = 'Special multiplier active on next event';
+            document.getElementById('combo-multiplier').textContent = `${this.comboMultiplier}x NEXT CARD!`;
+            document.getElementById('combo-description').textContent = 'Special multiplier active on next event';
         } else {
             comboSection.style.display = 'none';
         }
         
-        const chainSection = document.getElementById('chain-section');
-        const chainCounter = document.getElementById('chain-counter');
-        const chainDescription = document.getElementById('chain-description');
-        
+        // Chain display
         if (this.defensiveChain > 0) {
             chainSection.style.display = 'block';
-            chainCounter.textContent = `🔗 CHAIN x${this.chainMultiplier.toFixed(1)}`;
-            chainDescription.textContent = `${this.defensiveChain} defensive plays in a row!`;
+            document.getElementById('chain-counter').textContent = `🔗 CHAIN x${this.chainMultiplier.toFixed(1)}`;
+            document.getElementById('chain-description').textContent = `${this.defensiveChain} defensive plays in a row!`;
         } else {
             chainSection.style.display = 'none';
         }
@@ -557,46 +569,15 @@ class FootballGame {
     endGame() {
         const baseScore = this.score;
         const cardsInHand = this.hand.length;
-        
-        // Calculate penalty based on actual point values of remaining cards
         const handPenalty = this.hand.reduce((total, card) => total + card.points, 0);
-        
-        // Calculate final score (base score minus actual card values)
         const finalScore = baseScore - handPenalty;
-        this.score = finalScore;
         
+        this.score = finalScore;
         const isNewBest = finalScore > this.personalBest;
         
         this.updateStats();
         this.saveStats();
-        
-        // Show end game modal
         this.showEndGameModal(baseScore, cardsInHand, handPenalty, finalScore, isNewBest);
-    }
-    
-    showEndGameModal(baseScore, cardsInHand, handPenalty, finalScore, isNewBest) {
-        document.getElementById('modal-base-score').textContent = baseScore;
-        
-        // Show breakdown of remaining card values
-        if (cardsInHand > 0) {
-            const cardsList = this.hand.map(card => `${card.name} (${card.points}pts)`).join(', ');
-            document.getElementById('modal-hand-penalty').textContent = `${cardsInHand} cards: ${cardsList} = -${handPenalty}`;
-        } else {
-            document.getElementById('modal-hand-penalty').textContent = '0 cards = 0';
-        }
-        
-        document.getElementById('modal-final-score').textContent = finalScore;
-        
-        const newBestEl = document.getElementById('modal-new-best');
-        newBestEl.style.display = isNewBest ? 'block' : 'none';
-        
-        document.getElementById('end-game-modal').style.display = 'flex';
-    }
-    
-    closeEndGameModal() {
-        document.getElementById('end-game-modal').style.display = 'none';
-        this.resetGame();
-        this.showScreen('welcome-screen');
     }
     
     updateStats() {
@@ -607,30 +588,41 @@ class FootballGame {
         this.averageScore = Math.round(((this.averageScore * (this.gamesPlayed - 1)) + this.score) / this.gamesPlayed);
     }
     
-    saveStats() {
-        localStorage.setItem('football_best', this.personalBest.toString());
-        localStorage.setItem('football_games', this.gamesPlayed.toString());
-        localStorage.setItem('football_avg', this.averageScore.toString());
+    showEndGameModal(baseScore, cardsInHand, handPenalty, finalScore, isNewBest) {
+        document.getElementById('modal-base-score').textContent = baseScore;
+        
+        if (cardsInHand > 0) {
+            const cardsList = this.hand.map(card => `${card.name} (${card.points}pts)`).join(', ');
+            document.getElementById('modal-hand-penalty').textContent = 
+                `${cardsInHand} cards: ${cardsList} = -${handPenalty}`;
+        } else {
+            document.getElementById('modal-hand-penalty').textContent = '0 cards = 0';
+        }
+        
+        document.getElementById('modal-final-score').textContent = finalScore;
+        
+        const newBestEl = document.getElementById('modal-new-best');
+        if (isNewBest) {
+            newBestEl.classList.add('active');
+        } else {
+            newBestEl.classList.remove('active');
+        }
+        
+        document.getElementById('end-game-modal').classList.add('active');
+    }
+    
+    closeEndGameModal() {
+        document.getElementById('end-game-modal').classList.remove('active');
+        this.resetGameState();
+        this.dealHand();
+        this.showScreen('welcome-screen');
+        this.updateStatsDisplay();
     }
     
     updateStatsDisplay() {
         document.getElementById('best-score').textContent = this.personalBest;
         document.getElementById('total-games').textContent = this.gamesPlayed;
         document.getElementById('avg-score').textContent = this.averageScore;
-    }
-    
-    resetGame() {
-        this.score = 0;
-        this.comboMultiplier = 1;
-        this.chainMultiplier = 1;
-        this.cardsPlayed = 0;
-        this.defensiveChain = 0;
-        this.playHistory = [];
-        this.discardPile = [];
-        this.hasStarterDiscardCard = false;
-        this.cards = this.generateCards();
-        this.dealHand();
-        this.updateStatsDisplay();
     }
     
     showScreen(screenId) {
@@ -655,7 +647,7 @@ class FootballGame {
     }
 }
 
-// Initialize the game when the page loads
+// Initialize game when page loads
 window.addEventListener('load', () => {
     window.game = new FootballGame();
 });

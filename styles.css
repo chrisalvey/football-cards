@@ -1,3 +1,4 @@
+/* Reset and Base Styles */
 * {
     margin: 0;
     padding: 0;
@@ -15,9 +16,9 @@ body {
 .container {
     max-width: 400px;
     margin: 0 auto;
-    position: relative;
 }
 
+/* Screen Management */
 .screen {
     display: none;
     animation: fadeIn 0.3s ease-in;
@@ -32,6 +33,7 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* Logo */
 .logo {
     text-align: center;
     margin-bottom: 40px;
@@ -43,6 +45,7 @@ body {
     text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 }
 
+/* Buttons */
 .btn {
     width: 100%;
     padding: 15px;
@@ -97,6 +100,7 @@ body {
     gap: 12px;
 }
 
+/* Info Boxes */
 .setup-info {
     background: rgba(255,255,255,0.1);
     padding: 20px;
@@ -127,6 +131,7 @@ body {
     border: 1px solid rgba(255,255,255,0.2);
 }
 
+/* Stats Display */
 .stats-row {
     display: flex;
     justify-content: space-between;
@@ -146,13 +151,48 @@ body {
     color: #4CAF50;
 }
 
-.combo-section {
-    background: rgba(255,215,0,0.1);
-    border: 2px solid #FFD700;
+/* Rarity Guide */
+.rarity-guide {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+.rarity-title {
+    text-align: center;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.rarity-icons {
+    display: flex;
+    justify-content: space-around;
+    text-align: center;
+}
+
+.rarity-icons span {
+    font-size: 1.2em;
+}
+
+/* Game Systems */
+.combo-section, .chain-section {
     border-radius: 12px;
     padding: 15px;
     margin-bottom: 20px;
     text-align: center;
+    display: none;
+}
+
+.combo-section {
+    background: rgba(255,215,0,0.1);
+    border: 2px solid #FFD700;
+}
+
+.chain-section {
+    background: rgba(138,43,226,0.1);
+    border: 2px solid #8A2BE2;
 }
 
 .combo-multiplier {
@@ -162,20 +202,6 @@ body {
     margin-bottom: 5px;
 }
 
-.combo-description {
-    font-size: 0.9em;
-    opacity: 0.8;
-}
-
-.chain-section {
-    background: rgba(138,43,226,0.1);
-    border: 2px solid #8A2BE2;
-    border-radius: 12px;
-    padding: 15px;
-    margin-bottom: 20px;
-    text-align: center;
-}
-
 .chain-counter {
     font-size: 1.3em;
     font-weight: bold;
@@ -183,6 +209,12 @@ body {
     margin-bottom: 5px;
 }
 
+.combo-description {
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+/* Milestone Banner */
 .milestone-approach-banner {
     background: linear-gradient(45deg, #ff6b35, #f7931e);
     border: 2px solid #ff6b35;
@@ -258,6 +290,7 @@ body {
     opacity: 0.95;
 }
 
+/* Hand Management */
 .hand-section {
     margin: 20px 0;
 }
@@ -275,6 +308,7 @@ body {
     margin-bottom: 15px;
     text-align: center;
     font-weight: bold;
+    display: none;
 }
 
 .hand-full {
@@ -303,6 +337,7 @@ body {
     background: rgba(255,152,0,0.05);
 }
 
+/* Cards */
 .card {
     background: rgba(255,255,255,0.1);
     border: 2px solid rgba(255,255,255,0.2);
@@ -377,6 +412,7 @@ body {
     font-size: 16px;
 }
 
+/* Discard Modal */
 .discard-cards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -403,6 +439,7 @@ body {
     border-color: #ff5722;
 }
 
+/* Messages */
 .message-container {
     position: fixed;
     top: 20px;
@@ -413,6 +450,47 @@ body {
     max-width: 400px;
 }
 
+.message {
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    font-weight: 500;
+    text-align: center;
+    animation: slideDown 0.3s ease-out;
+}
+
+.message-success {
+    background: rgba(76,175,80,0.9);
+    border: 1px solid #4CAF50;
+}
+
+.message-error {
+    background: rgba(244,67,54,0.9);
+    border: 1px solid #f44336;
+}
+
+.message-info {
+    background: rgba(33,150,243,0.9);
+    border: 1px solid #2196F3;
+}
+
+.message-special {
+    background: rgba(156,39,176,0.9);
+    border: 1px solid #9c27b0;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Modals */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -420,11 +498,15 @@ body {
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.8);
-    display: flex;
+    display: none;
     justify-content: center;
     align-items: center;
     z-index: 2000;
     animation: fadeIn 0.3s ease-in;
+}
+
+.modal-overlay.active {
+    display: flex;
 }
 
 .modal-content {
@@ -492,6 +574,11 @@ body {
     font-weight: bold;
     color: #4CAF50;
     animation: pulse 2s infinite;
+    display: none;
+}
+
+.new-best.active {
+    display: block;
 }
 
 @keyframes pulse {
@@ -500,46 +587,7 @@ body {
     100% { opacity: 1; }
 }
 
-.message {
-    padding: 15px;
-    border-radius: 10px;
-    margin-bottom: 10px;
-    font-weight: 500;
-    text-align: center;
-    animation: slideDown 0.3s ease-out;
-}
-
-.message-success {
-    background: rgba(76,175,80,0.9);
-    border: 1px solid #4CAF50;
-}
-
-.message-error {
-    background: rgba(244,67,54,0.9);
-    border: 1px solid #f44336;
-}
-
-.message-info {
-    background: rgba(33,150,243,0.9);
-    border: 1px solid #2196F3;
-}
-
-.message-special {
-    background: rgba(156,39,176,0.9);
-    border: 1px solid #9c27b0;
-}
-
-@keyframes slideDown {
-    from {
-        transform: translateY(-100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
+/* Mobile Responsiveness */
 @media (max-width: 480px) {
     .container {
         padding: 10px;
@@ -547,5 +595,9 @@ body {
     
     .logo h1 {
         font-size: 2em;
+    }
+    
+    .hand-cards {
+        grid-template-columns: 1fr;
     }
 }
